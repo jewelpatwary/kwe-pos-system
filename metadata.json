@@ -1,0 +1,6 @@
+{
+  "name": "KWE POS System",
+  "description": "An offline-first POS, Inventory, and ERP system with role-based access control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
