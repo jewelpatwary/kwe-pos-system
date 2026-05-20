@@ -433,10 +433,10 @@ export default function POS() {
              </button>
              <button 
                 disabled={items.length === 0}
-                onClick={() => handleCompleteSale('CASH')}
-                className="bg-emerald-600 border border-emerald-500 text-white py-2 rounded font-black tracking-widest shadow-xl shadow-emerald-500/10 hover:bg-emerald-700 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-2"
+                onClick={() => handleCompleteSale('ONLINE')}
+                className="bg-slate-100 border border-slate-200 text-slate-800 py-2 rounded font-black tracking-widest hover:bg-slate-200 shadow-sm transition-all disabled:opacity-20 flex items-center justify-center gap-2"
              >
-                <Banknote className="w-3.5 h-3.5" /> Exact Cash
+                <ShoppingCart className="w-3.5 h-3.5 text-indigo-600" /> TNG
              </button>
              <button 
                 disabled={items.length === 0}
@@ -447,10 +447,10 @@ export default function POS() {
              </button>
              <button 
                 disabled={items.length === 0}
-                onClick={() => handleCompleteSale('ONLINE')}
-                className="bg-slate-100 border border-slate-200 text-slate-800 py-2 rounded font-black tracking-widest hover:bg-slate-200 shadow-sm transition-all disabled:opacity-20 flex items-center justify-center gap-2"
+                onClick={() => handleCompleteSale('CASH')}
+                className="bg-emerald-600 border border-emerald-500 text-white py-2 rounded font-black tracking-widest shadow-xl shadow-emerald-500/10 hover:bg-emerald-700 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-2"
              >
-                <ShoppingCart className="w-3.5 h-3.5 text-indigo-600" /> TNG
+                <Banknote className="w-3.5 h-3.5" /> Exact Cash
              </button>
           </div>
         </div>
@@ -860,7 +860,12 @@ export default function POS() {
                   <div className="flex justify-between items-center">
                     <div>
                       <div className="font-black text-slate-900 group-hover:text-indigo-600 uppercase italic tracking-tighter text-[11px] transition-colors">{c.name}</div>
-                      <div className="text-[7px] text-slate-400 font-black tracking-widest mt-1 italic">{c.rfid_card || 'No Card'}</div>
+                      <div className="flex gap-2 items-center mt-1">
+                        <div className="text-[7px] text-slate-400 font-black tracking-widest italic">{c.rfid_card || 'No Card'}</div>
+                        <div className={`text-[6px] px-1 rounded font-black tracking-widest ${c.member_type === 'WALKIN' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {c.member_type === 'WALKIN' ? 'WALK IN' : 'DELIVERY'}
+                        </div>
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="text-[14px] font-black text-orange-600 italic">{currency.symbol}{c.current_balance.toFixed(2)}</div>

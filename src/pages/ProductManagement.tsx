@@ -367,6 +367,12 @@ export default function ProductManagement() {
         
         <div className="flex items-center gap-2">
             <button 
+                onClick={() => navigate('/admin/expiry-insights')}
+                className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded hover:bg-red-100 transition flex items-center gap-2 shadow-sm uppercase font-black"
+            >
+                <AlertTriangle className="w-3.5 h-3.5" /> EXPIRY_INSIGHTS_PROTOCOL
+            </button>
+            <button 
                 onClick={() => setShowImportModal(true)}
                 className="bg-slate-100 border border-slate-200 text-slate-600 px-3 py-2 rounded hover:bg-slate-200 transition flex items-center gap-2 shadow-sm"
             >
@@ -513,27 +519,27 @@ export default function ProductManagement() {
 
       {/* Bulk Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-[#0f1117]/90 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-            <div className="bg-[#181a20] border border-[#2d303b] rounded max-w-sm w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
-                <div className="p-3 border-b border-[#2d303b] bg-[#1c1f26] flex justify-between items-center">
-                    <span className="text-white font-black tracking-widest">Bulk Import Sync</span>
-                    <button onClick={() => setShowImportModal(false)} className="text-slate-500 hover:text-white"><X size={16}/></button>
+        <div className="fixed inset-0 bg-slate-100/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 rounded max-w-sm w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+                <div className="p-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                    <span className="text-slate-900 font-black tracking-widest">Bulk Import Sync</span>
+                    <button onClick={() => setShowImportModal(false)} className="text-slate-500 hover:text-slate-900"><X size={16}/></button>
                 </div>
                 <div className="p-6 space-y-6">
-                    <div className="border-2 border-dashed border-[#2d303b] p-10 text-center bg-[#1c1f26] relative group hover:border-indigo-500/30 transition-all">
-                         <UploadCloud className="w-8 h-8 mx-auto text-slate-700 mb-2 group-hover:text-indigo-400 transition-colors" />
+                    <div className="border-2 border-dashed border-slate-200 p-10 text-center bg-slate-50 relative group hover:border-indigo-500/30 transition-all">
+                         <UploadCloud className="w-8 h-8 mx-auto text-slate-400 mb-2 group-hover:text-indigo-600 transition-colors" />
                          <div className="text-slate-600 text-[8px] font-black uppercase tracking-[0.3em]">Select CSV File</div>
                          <input type="file" onChange={e => setImportFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
-                         {importFile && <div className="mt-4 text-emerald-400 font-black italic underline underline-offset-4 decoration-emerald-900">{importFile.name}</div>}
+                         {importFile && <div className="mt-4 text-emerald-600 font-black italic underline underline-offset-4 decoration-emerald-200">{importFile.name}</div>}
                     </div>
                     <a 
                       href="data:text/csv;charset=utf-8,name,barcode,category_id,brand_id,unit_id,purchase_price,selling_price,stock_quantity,supplier_id%0AExample Product,123456789,1,1,1,10.00,20.00,100,1"
                       download="product_sample.csv"
-                      className="block text-center py-2 bg-slate-700 text-white font-black text-[8px] tracking-widest hover:bg-slate-800 transition-all rounded"
+                      className="block text-center py-2 bg-slate-600 text-white font-black text-[8px] tracking-widest hover:bg-slate-700 transition-all rounded"
                     >
                       Download Sample CSV
                     </a>
-                    {importStatus && <div className="text-[8px] font-black text-indigo-400 italic tracking-widest bg-[#0f1117] p-2 border border-[#2d303b]">{importStatus}</div>}
+                    {importStatus && <div className="text-[8px] font-black text-indigo-600 italic tracking-widest bg-slate-100 p-2 border border-slate-200">{importStatus}</div>}
                     <button 
                         onClick={handleImport}
                         disabled={!importFile || importLoading}

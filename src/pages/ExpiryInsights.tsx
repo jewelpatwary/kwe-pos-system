@@ -106,6 +106,7 @@ const ExpiryInsights: React.FC = () => {
                 <option value={60}>EXPIRES_IN_60_DAYS</option>
                 <option value={90}>EXPIRES_IN_90_DAYS</option>
                 <option value={180}>EXPIRES_IN_180_DAYS</option>
+                <option value={365}>EXPIRY_INSIGHTS_PROTOCOL</option>
               </select>
             </div>
             <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-black hover:opacity-90 transition shadow-lg">

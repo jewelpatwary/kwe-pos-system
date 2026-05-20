@@ -25,8 +25,31 @@ export default function CreditCustomers() {
   const [formData, setFormData] = useState({
     id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', 
     working_place: '', emp_id: '', passport_no: '', 
-    daily_limit: '0', monthly_limit: '0', auto_burn: false, auto_burn_start_date: '', auto_burn_stop_date: ''
+    daily_limit: '0', daily_limit_mode: 'MANUAL', monthly_limit: '0', 
+    total_pax: '1', total_monthly_limit: '0',
+    auto_burn: false, auto_burn_start_date: '', auto_burn_stop_date: ''
   });
+
+  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+
+  useEffect(() => {
+    const pax = parseFloat(formData.total_pax) || 1;
+    const mLimit = parseFloat(formData.monthly_limit) || 0;
+    const totalMLimit = (pax * mLimit).toFixed(2);
+    
+    let nextDailyLimit = formData.daily_limit;
+    if (formData.daily_limit_mode === 'AUTO') {
+      const now = new Date();
+      const days = getDaysInMonth(now.getFullYear(), now.getMonth());
+      nextDailyLimit = (parseFloat(totalMLimit) / days).toFixed(2);
+    }
+
+    setFormData(prev => ({ 
+      ...prev, 
+      total_monthly_limit: totalMLimit,
+      daily_limit: nextDailyLimit
+    }));
+  }, [formData.monthly_limit, formData.total_pax, formData.daily_limit_mode]);
 
   const { token } = useAuthStore();
   const { currency } = useTheme();
@@ -34,11 +57,10 @@ export default function CreditCustomers() {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/customers', { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch('/api/customers?type=WALKIN', { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
       if (data.success) {
-          // Filter for credit customers if needed, though for now let's show all
-          setCustomers(data.data);
+          setCustomers(data.data || []);
       }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -74,8 +96,8 @@ export default function CreditCustomers() {
     console.log('Submitting formData:', formData);
 
     // Manual validation
-    if(!formData.name || !formData.working_place || !formData.emp_id || !formData.passport_no || !formData.monthly_limit || !formData.auto_burn_start_date) {
-        alert('Please fill in all required fields: Name, Working Place, Emp ID, Passport No, Monthly Limit, and Auto Burn Start Date.');
+    if(!formData.name || !formData.working_place || !formData.passport_no || !formData.monthly_limit || !formData.auto_burn_start_date) {
+        alert('Please fill in all required fields: Name, Working Place, Passport No, Monthly Limit, and Auto Burn Start Date.');
         return;
     }
 
@@ -92,7 +114,10 @@ export default function CreditCustomers() {
           credit_limit: Number(formData.credit_limit),
           daily_limit: Number(formData.daily_limit || 0),
           monthly_limit: Number(formData.monthly_limit),
+          total_pax: Number(formData.total_pax || 1),
+          total_monthly_limit: Number(formData.total_monthly_limit || 0),
           auto_burn: formData.auto_burn ? 1 : 0,
+          member_type: 'WALKIN'
         })
       });
       const data = await res.json();
@@ -127,7 +152,8 @@ export default function CreditCustomers() {
             passport_no: row.passport_no || '',
             auto_burn: row.auto_burn === 'true' || row.auto_burn === '1',
             auto_burn_start_date: row.auto_burn_start_date || '',
-            auto_burn_stop_date: row.auto_burn_stop_date || ''
+            auto_burn_stop_date: row.auto_burn_stop_date || '',
+            member_type: 'WALKIN'
           }));
 
           const res = await fetch('/api/customers/bulk', {
@@ -168,11 +194,11 @@ export default function CreditCustomers() {
   return (
     <div className="p-4 h-full flex flex-col bg-white text-slate-800 font-sans text-[10px] uppercase">
       <div className="bg-slate-50 border border-slate-200 p-3 flex justify-between items-center mb-4">
-        <h1 className="text-sm font-black flex items-center gap-2"><CreditCard className="w-4 h-4"/> Credit Customers</h1>
+        <h1 className="text-sm font-black flex items-center gap-2"><CreditCard className="w-4 h-4"/> MEMBERS (WALK IN)</h1>
         <div className="flex gap-2">
             <button onClick={() => setShowPrintModal(true)} className="bg-slate-200 px-3 py-1.5 rounded flex items-center gap-1 font-black"><Printer size={12}/> Print Report</button>
             <button onClick={() => setShowImportModal(true)} className="bg-white border border-slate-200 px-3 py-1.5 rounded flex items-center gap-1 font-black hover:bg-slate-50 transition-colors"><UploadCloud size={12}/> Bulk Upload</button>
-            <button onClick={() => { setFormData({ id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', working_place: '', emp_id: '', passport_no: '', monthly_limit: '0', auto_burn: false, auto_burn_start_date: '', auto_burn_stop_date: '' }); setShowForm(true); }} className="bg-indigo-600 text-white px-3 py-1.5 rounded flex items-center gap-1 font-black hover:bg-indigo-700 transition-colors"><Plus size={12}/> Add Credit Member</button>
+            <button onClick={() => { setFormData({ id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', working_place: '', emp_id: '', passport_no: '', daily_limit: '0', daily_limit_mode: 'MANUAL', monthly_limit: '0', total_pax: '1', total_monthly_limit: '0', auto_burn: false, auto_burn_start_date: '', auto_burn_stop_date: '' }); setShowForm(true); }} className="bg-indigo-600 text-white px-3 py-1.5 rounded flex items-center gap-1 font-black hover:bg-indigo-700 transition-colors"><Plus size={12}/> Add Member (Walk In)</button>
         </div>
       </div>
 
@@ -180,9 +206,9 @@ export default function CreditCustomers() {
         <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
+                    <th className="py-3 px-4 font-black">RFID Card</th>
                     <th className="py-3 px-4 font-black">Name</th>
                     <th className="py-3 px-4 font-black">Workplace</th>
-                    <th className="py-3 px-4 font-black">Emp ID</th>
                     <th className="py-3 px-4 font-black">Daily Limit</th>
                     <th className="py-3 px-4 font-black">Monthly Limit</th>
                     <th className="py-3 px-4 font-black">Auto Burn</th>
@@ -192,9 +218,9 @@ export default function CreditCustomers() {
             <tbody className="divide-y divide-slate-100">
                 {activeCustomers.map(c => (
                     <tr key={c.id} className="hover:bg-slate-50">
+                        <td className="py-3 px-4 font-black text-indigo-600">{c.rfid_card || 'NONE'}</td>
                         <td className="py-3 px-4 font-black">{c.name}</td>
                         <td className="py-3 px-4">{c.working_place || '-'}</td>
-                        <td className="py-3 px-4">{c.emp_id || '-'}</td>
                         <td className="py-3 px-4">{c.daily_limit}</td>
                         <td className="py-3 px-4">{c.monthly_limit}</td>
                         <td className="py-3 px-4">{c.auto_burn ? 'YES' : 'NO'}</td>
@@ -212,6 +238,9 @@ export default function CreditCustomers() {
                                   emp_id: c.emp_id || '',
                                   passport_no: c.passport_no || '',
                                   daily_limit: c.daily_limit?.toString() || '0',
+                                  daily_limit_mode: c.daily_limit_mode || 'MANUAL',
+                                  total_pax: c.total_pax?.toString() || '1',
+                                  total_monthly_limit: c.total_monthly_limit?.toString() || '0',
                                   auto_burn: !!c.auto_burn,
                                   auto_burn_start_date: c.auto_burn_start_date || '',
                                   auto_burn_stop_date: c.auto_burn_stop_date || ''
@@ -277,6 +306,22 @@ export default function CreditCustomers() {
                     <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-900 transition-colors"><X size={24}/></button>
                 </div>
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1 relative group">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest flex justify-between items-center">
+                            <span>RFID Card</span>
+                            <button type="button" onClick={() => document.getElementById('rfid_input')?.focus()} className="text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors bg-indigo-50 px-1.5 py-0.5 rounded">
+                                <Scan className="w-3 h-3" /> SCAN
+                            </button>
+                        </label>
+                        <input 
+                            id="rfid_input"
+                            className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                            placeholder="Select and scan card..." 
+                            value={formData.rfid_card || ''} 
+                            onChange={e => setFormData({...formData, rfid_card: e.target.value})} 
+                            onKeyDown={(e) => { if(e.key === 'Enter'){ e.preventDefault(); e.currentTarget.blur(); } }}
+                        />
+                    </div>
                     <div className="space-y-1">
                         <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Name</label>
                         <input className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Enter Full Name" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
@@ -286,20 +331,43 @@ export default function CreditCustomers() {
                         <input className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Enter Workplace" value={formData.working_place || ''} onChange={e => setFormData({...formData, working_place: e.target.value})} />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Emp ID</label>
-                        <input className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Enter Emp ID" type="text" value={formData.emp_id || ''} onChange={e => setFormData({...formData, emp_id: e.target.value})} />
-                    </div>
-                    <div className="space-y-1">
                         <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Passport No</label>
                         <input className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Enter Passport No" type="text" value={formData.passport_no || ''} onChange={e => setFormData({...formData, passport_no: e.target.value})} />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Daily Limit</label>
-                        <input className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0.00" type="number" value={formData.daily_limit} onChange={e => setFormData({...formData, daily_limit: e.target.value})} />
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest flex justify-between">
+                            <span>Daily Limit</span>
+                            <div className="flex gap-2">
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="radio" className="w-2.5 h-2.5" checked={formData.daily_limit_mode === 'AUTO'} onChange={() => setFormData({...formData, daily_limit_mode: 'AUTO'})} />
+                                    <span className="text-[7px]">AUTO</span>
+                                </label>
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="radio" className="w-2.5 h-2.5" checked={formData.daily_limit_mode === 'MANUAL'} onChange={() => setFormData({...formData, daily_limit_mode: 'MANUAL'})} />
+                                    <span className="text-[7px]">MANUAL</span>
+                                </label>
+                            </div>
+                        </label>
+                        <input 
+                            className={`w-full border border-slate-300 rounded p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${formData.daily_limit_mode === 'AUTO' ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`} 
+                            placeholder="0.00" 
+                            type="number" 
+                            readOnly={formData.daily_limit_mode === 'AUTO'}
+                            value={formData.daily_limit || ''} 
+                            onChange={e => setFormData({...formData, daily_limit: e.target.value})} 
+                        />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Monthly Limit</label>
-                        <input className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0.00" type="number" value={formData.monthly_limit} onChange={e => setFormData({...formData, monthly_limit: e.target.value})} />
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Monthly Limit Per Pax</label>
+                        <input className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0.00" type="number" value={formData.monthly_limit || ''} onChange={e => setFormData({...formData, monthly_limit: e.target.value})} />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Total Pax</label>
+                        <input className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold" placeholder="1" type="number" value={formData.total_pax || '1'} onChange={e => setFormData({...formData, total_pax: e.target.value})} />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Total Monthly Limit</label>
+                        <input className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50 font-black text-indigo-600" placeholder="0.00" type="number" readOnly value={formData.total_monthly_limit || ''} />
                     </div>
                     <div className="flex gap-4 items-center pt-5">
                         <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Auto Burn</label>
@@ -307,11 +375,11 @@ export default function CreditCustomers() {
                     </div>
                     <div className="space-y-1">
                         <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Auto Burn Start Date</label>
-                        <input type="date" className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.auto_burn_start_date} onChange={e => setFormData({...formData, auto_burn_start_date: e.target.value})} />
+                        <input type="date" className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.auto_burn_start_date || ''} onChange={e => setFormData({...formData, auto_burn_start_date: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                         <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Auto Burn Stop Date</label>
-                        <input type="date" className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.auto_burn_stop_date} onChange={e => setFormData({...formData, auto_burn_stop_date: e.target.value})} />
+                        <input type="date" className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.auto_burn_stop_date || ''} onChange={e => setFormData({...formData, auto_burn_stop_date: e.target.value})} />
                     </div>
                     
                     <button type="submit" className="md:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white py-4 font-black rounded text-sm tracking-widest uppercase transition-colors mt-4">Save Customer Information</button>

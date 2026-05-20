@@ -27,12 +27,47 @@ export default function StockAdjustment() {
   const [filterReason, setFilterReason] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
 
+  const [activeTab, setActiveTab] = useState<'MANUAL' | 'AUDIT'>('MANUAL');
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessionItems, setSessionItems] = useState<any[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [selectedAuditItem, setSelectedAuditItem] = useState<any>(null);
+
   const barcodeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProducts();
     fetchAdjustments();
+    fetchInventorySessions();
   }, []);
+
+  const fetchInventorySessions = async () => {
+    try {
+      const res = await fetch('/api/admin/inventory/sessions', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSessions(data.data.filter((s:any) => s.status === 'COMPLETED'));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const loadSessionItems = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/inventory/sessions/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSessionItems(data.data.items);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -107,19 +142,25 @@ export default function StockAdjustment() {
     setSuccess('');
 
     try {
+      const payload: any = {
+          product_id: selectedProduct.id,
+          adjustment_type: adjustmentType,
+          quantity: qty,
+          reason: reason,
+          note: note
+      };
+
+      if (activeTab === 'AUDIT' && selectedAuditItem) {
+          payload.inventory_item_id = selectedAuditItem.id;
+      }
+
       const res = await fetch('/api/stock-adjustments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          product_id: selectedProduct.id,
-          adjustment_type: adjustmentType,
-          quantity: qty,
-          reason: reason,
-          note: note
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json();
@@ -165,6 +206,37 @@ export default function StockAdjustment() {
         {/* Form Area */}
         <div className="w-80 shrink-0 border-r border-slate-200 bg-white overflow-auto p-4 space-y-6">
            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="flex bg-slate-100 p-1 rounded">
+                <button type="button" onClick={() => setActiveTab('MANUAL')} className={`flex-1 py-2 rounded text-[8px] font-black tracking-widest ${activeTab === 'MANUAL' ? 'bg-white shadow-sm' : ''}`}>MANUAL</button>
+                <button type="button" onClick={() => setActiveTab('AUDIT')} className={`flex-1 py-2 rounded text-[8px] font-black tracking-widest ${activeTab === 'AUDIT' ? 'bg-white shadow-sm' : ''}`}>AUDIT LOG</button>
+              </div>
+
+              {activeTab === 'AUDIT' && (
+                <div className="space-y-4 animate-in fade-in">
+                  <select className="w-full bg-slate-100 border border-slate-200 rounded p-2 text-[9px]" onChange={(e) => {
+                     const sessId = parseInt(e.target.value);
+                     setSelectedSessionId(sessId);
+                     loadSessionItems(sessId);
+                  }}>
+                     <option value="">SELECT_AUDIT_SESSION</option>
+                     {sessions.map(s => <option key={s.id} value={s.id}>#{s.id} - {s.date}</option>)}
+                  </select>
+                  
+                  {sessionItems.length > 0 && (
+                     <select className="w-full bg-slate-100 border border-slate-200 rounded p-2 text-[9px]" onChange={(e) => {
+                        const item = sessionItems.find(i => i.id === parseInt(e.target.value));
+                        setSelectedAuditItem(item);
+                        setSelectedProduct({ id: item.product_id, name: item.name, barcode: item.barcode, stock_quantity: item.system_stock });
+                        setQuantity(Math.abs(item.difference).toString());
+                        setAdjustmentType(item.difference > 0 ? 'IN' : 'OUT');
+                     }}>
+                        <option value="">SELECT_AUDIT_ITEM</option>
+                        {sessionItems.map(i => <option key={i.id} value={i.id}>{i.name} (Diff: {i.difference})</option>)}
+                     </select>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
                  <label className="text-slate-500 font-black tracking-widest text-[8px]">ENTITY_QUERY</label>
                  <div className="relative">

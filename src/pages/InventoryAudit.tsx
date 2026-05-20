@@ -3,11 +3,15 @@ import {
   ClipboardCheck, Search, Plus, Trash2, Save, 
   ArrowLeft, CheckCircle2, AlertCircle, RefreshCcw,
   BarChart3, History, PackageSearch, PackageOpen,
-  ArrowRightLeft, AlertTriangle, Check
+  ArrowRightLeft, AlertTriangle, Check, Edit2, X,
+  FileText, FileSpreadsheet
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import ConfirmModal from '../components/ConfirmModal';
 import { useTheme } from '../components/ThemeProvider';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 interface InventorySession {
   id: number;
@@ -55,9 +59,12 @@ export default function InventoryAudit() {
   
   // Editor state
   const [searchQuery, setSearchQuery] = useState('');
+  const [tableSearchQuery, setTableSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [physicalCount, setPhysicalCount] = useState<string>('');
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editingPhysicalCount, setEditingPhysicalCount] = useState<string>('');
   const [completing, setCompleting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<number | null>(null);
@@ -108,28 +115,26 @@ export default function InventoryAudit() {
   };
 
   const deleteSession = async (id: number) => {
-    console.log("Delete session function called for ID:", id);
+    console.log("[AUDIT] deleteSession called for ID:", id);
+    if (!id) return;
     try {
-      console.log("Proceeding to delete session ID:", id);
       setDeletingId(id);
       const res = await fetch(`/api/admin/inventory/sessions/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      console.log("Delete session response status:", res.status);
+      const resData = await res.json();
+      console.log("[AUDIT] Delete session response:", resData);
       
-      if (res.ok) {
-        console.log("Delete session successful");
+      if (res.ok && resData.success) {
         fetchSessions();
         fetchStats();
       } else {
-        const error = await res.json();
-        console.error("Delete session error response:", error);
-        alert(error.message || 'Error deleting session');
+        alert(resData.message || 'Error deleting session');
       }
     } catch (err) {
-      console.error("Delete session error:", err);
+      console.error("[AUDIT] Delete session network error:", err);
       alert('An error occurred during deletion.');
     } finally {
       setDeletingId(null);
@@ -137,9 +142,9 @@ export default function InventoryAudit() {
   };
 
   const deleteItemFromSession = async (itemId: number) => {
-    console.log("Attempting to delete item:", itemId, "Active session:", activeSession?.id);
-    if (!activeSession) {
-      console.error("No active session");
+    console.log("[AUDIT] deleteItemFromSession called for Item ID:", itemId);
+    if (!activeSession || !itemId) {
+      console.error("[AUDIT] Missing activeSession or itemId");
       return;
     }
     
@@ -149,25 +154,23 @@ export default function InventoryAudit() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      console.log("Delete response:", res.status, res.ok);
+      const resData = await res.json();
+      console.log("[AUDIT] Delete item response:", resData);
 
-      if (res.ok) {
-        // Refresh session items
+      if (res.ok && resData.success) {
+        // Refresh session items directly
         const sessionRes = await fetch(`/api/admin/inventory/sessions/${activeSession.id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const sessionData = await sessionRes.json();
-        console.log("Refresh response data:", sessionData);
         if (sessionData.success) {
           setSessionItems(sessionData.data.items || []);
         }
       } else {
-        const error = await res.json();
-        console.error("Delete error:", error);
-        alert(`Error deleting item ${itemId} from session ${activeSession.id}: ${error.message || 'Unknown error'}`);
+        alert(`Error deleting item: ${resData.message || 'Unknown error'}`);
       }
     } catch (err) {
-      console.error("Catch error:", err);
+      console.error("[AUDIT] deleteItemFromSession network error:", err);
     }
   };
 
@@ -247,8 +250,11 @@ export default function InventoryAudit() {
     // Auto focus physical count input if we had ref
   };
 
-  const addOrUpdateItem = async () => {
-    if (!selectedProduct || physicalCount === '' || !activeSession) return;
+  const addOrUpdateItem = async (isInline: boolean = false) => {
+    const prodId = isInline ? sessionItems.find(i => i.id === editingItemId)?.product_id : selectedProduct?.id;
+    const count = isInline ? editingPhysicalCount : physicalCount;
+    
+    if (!prodId || count === '' || !activeSession) return;
     
     try {
       const res = await fetch(`/api/admin/inventory/sessions/${activeSession.id}/items`, {
@@ -258,8 +264,8 @@ export default function InventoryAudit() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          product_id: selectedProduct.id,
-          physical_stock: parseFloat(physicalCount)
+          product_id: prodId,
+          physical_stock: parseFloat(count)
         })
       });
       
@@ -272,8 +278,14 @@ export default function InventoryAudit() {
         if (sessionData.success) {
           setSessionItems(sessionData.data.items || []);
         }
-        setSelectedProduct(null);
-        setPhysicalCount('');
+        
+        if (isInline) {
+          setEditingItemId(null);
+          setEditingPhysicalCount('');
+        } else {
+          setSelectedProduct(null);
+          setPhysicalCount('');
+        }
       } else {
         const error = await res.json();
         alert(error.message || 'Error updating item');
@@ -319,211 +331,341 @@ export default function InventoryAudit() {
     }
   };
 
+  const exportToPDF = () => {
+    if (!activeSession || sessionItems.length === 0) return;
+    
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(`Inventory Audit Session #${activeSession.id}`, 14, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Date: ${new Date(activeSession.created_at).toLocaleString()}`, 14, 30);
+    doc.text(`Inspector: ${activeSession.creator_name}`, 14, 37);
+    
+    const tableData = sessionItems.map(item => [
+      item.name,
+      item.barcode,
+      item.system_stock.toString(),
+      item.physical_stock.toString(),
+      item.difference.toString(),
+      `${currency.symbol}${item.value_difference.toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      startY: 45,
+      head: [['Product', 'Barcode', 'System Stock', 'Physical Count', 'Variance', 'Value Diff']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] }, // indigo-600
+    });
+
+    doc.save(`Audit_Session_${activeSession.id}.pdf`);
+  };
+
+  const exportToExcel = () => {
+    if (!activeSession || sessionItems.length === 0) return;
+
+    const data = sessionItems.map(item => ({
+      'Product': item.name,
+      'Barcode': item.barcode,
+      'System Stock': item.system_stock,
+      'Physical Count': item.physical_stock,
+      'Variance': item.difference,
+      'Value Difference': item.value_difference
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Audit Items");
+    XLSX.writeFile(wb, `Audit_Session_${activeSession.id}.xlsx`);
+  };
+
   if (view === 'editor' && activeSession) {
     return (
-      <div className="h-full flex flex-col bg-slate-50">
-        {/* Editor Header */}
-        <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between shadow-sm sticky top-0 z-50">
-           <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setView('list')}
-                className="p-1.5 hover:bg-slate-100 rounded transition-colors text-slate-500"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              <div>
-                <div className="flex items-center gap-2">
-                   <ClipboardCheck className="w-4 h-4 text-indigo-600" />
-                   <h1 className="font-black text-slate-900 tracking-widest uppercase">AUDIT_SESSION_#{activeSession.id}</h1>
-                   <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-600 text-[8px] font-black uppercase tracking-widest leading-none">DRAFT_MODE</span>
+      <>
+        <div className="h-full flex flex-col bg-slate-50">
+          {/* Editor Header */}
+          <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between shadow-sm sticky top-0 z-50">
+             <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setView('list')}
+                  className="p-1.5 hover:bg-slate-100 rounded transition-colors text-slate-500"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                     <ClipboardCheck className="w-4 h-4 text-indigo-600" />
+                     <h1 className="font-black text-slate-900 tracking-widest uppercase">AUDIT_SESSION_#{activeSession.id}</h1>
+                     <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-600 text-[8px] font-black uppercase tracking-widest leading-none">DRAFT_MODE</span>
+                  </div>
+                  <div className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 mt-1">STARTED_ON: {new Date(activeSession.created_at).toLocaleString()}</div>
                 </div>
-                <div className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 mt-1">STARTED_ON: {new Date(activeSession.created_at).toLocaleString()}</div>
-              </div>
-           </div>
+             </div>
 
-           <div className="flex items-center gap-2">
-              <button 
-                onClick={() => completeSession('FINISH_ONLY')}
-                disabled={completing || sessionItems.length === 0}
-                className="px-4 py-2 rounded text-slate-500 hover:text-slate-900 text-[9px] font-black tracking-widest uppercase transition-colors disabled:opacity-30"
-              >
-                SAVE_AS_REPORT
-              </button>
-              <button 
-                onClick={() => completeSession('AUTO_UPDATE')}
-                disabled={completing || sessionItems.length === 0}
-                className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-500/10 text-[9px] font-black tracking-widest uppercase disabled:opacity-30"
-              >
-                <RefreshCcw className={`w-3.5 h-3.5 ${completing ? 'animate-spin' : ''}`} /> SYNC_STOCK_LEVELS
-              </button>
-           </div>
-        </div>
+             <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 mr-4 border-r border-slate-200 pr-4">
+                  <button 
+                    onClick={exportToPDF}
+                    disabled={sessionItems.length === 0}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                    title="EXPORT_PDF"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={exportToExcel}
+                    disabled={sessionItems.length === 0}
+                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                    title="EXPORT_EXCEL"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </button>
+                </div>
 
-        <div className="flex-1 flex overflow-hidden">
-           {/* Left Sidebar: Form */}
-           <div className="w-[350px] border-r border-slate-200 p-6 bg-white flex flex-col gap-6">
-              <div className="space-y-4">
-                 <div>
-                    <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 shadow-inner">IDENTIFY_ASSET_BY_LABEL</label>
-                    <div className="relative">
-                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                       <input 
-                         type="text"
-                         placeholder="SCAN_BARCODE_OR_SEARCH..."
-                         className="w-full bg-slate-50 border border-slate-200 rounded pl-9 pr-4 py-2.5 text-[10px] font-black italic outline-none focus:ring-1 focus:ring-indigo-500 shadow-inner"
-                         value={searchQuery}
-                         onChange={(e) => {
-                           setSearchQuery(e.target.value);
-                           searchProducts(e.target.value);
-                         }}
-                       />
-                       {searchResults.length > 0 && (
-                          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded shadow-2xl z-[100] max-h-[300px] overflow-auto">
-                            {searchResults.map(p => (
-                               <button 
-                                 key={p.id}
-                                 onClick={() => handleProductSelect(p)}
-                                 className="w-full p-3 flex flex-col items-start border-b border-slate-100 hover:bg-indigo-50 transition-colors text-left group"
-                               >
-                                  <div className="font-black text-slate-900 text-[10px] group-hover:text-indigo-600 flex items-center justify-between w-full">
-                                    <span>{p.name}</span>
-                                    <span className="text-[7px] bg-slate-100 px-1 rounded">{p.stock_quantity} UNIT</span>
-                                  </div>
-                                  <div className="text-[8px] text-slate-400 font-bold tracking-widest mt-0.5">{p.barcode}</div>
-                               </button>
-                            ))}
-                          </div>
-                       )}
+                <button 
+                  onClick={() => completeSession('FINISH_ONLY')}
+                  disabled={completing || sessionItems.length === 0}
+                  className="px-4 py-2 rounded text-slate-500 hover:text-slate-900 text-[9px] font-black tracking-widest uppercase transition-colors disabled:opacity-30"
+                >
+                  SAVE_AS_REPORT
+                </button>
+                <button 
+                  onClick={() => completeSession('AUTO_UPDATE')}
+                  disabled={completing || sessionItems.length === 0}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-500/10 text-[9px] font-black tracking-widest uppercase disabled:opacity-30"
+                >
+                  <RefreshCcw className={`w-3.5 h-3.5 ${completing ? 'animate-spin' : ''}`} /> SYNC_STOCK_LEVELS
+                </button>
+             </div>
+          </div>
+
+          <div className="flex-1 flex overflow-hidden">
+             {/* Main Area: Item List */}
+             <div className="flex-1 p-6 overflow-auto">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full border-t-2 border-t-indigo-500">
+                   <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 gap-4 flex-wrap">
+                    <div className="flex items-center gap-4 flex-1 min-w-[300px]">
+                        <div className="relative flex-1">
+                           <PackageSearch className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-indigo-500" />
+                           <input 
+                             type="text"
+                             placeholder="SCAN_BARCODE_OR_SEARCH_PRODUCT_TO_ADD..."
+                             className="w-full bg-white border border-indigo-200 rounded pl-9 py-2 text-[9px] font-black italic outline-none focus:ring-2 focus:ring-indigo-500/20"
+                             value={searchQuery}
+                             onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                searchProducts(e.target.value);
+                             }}
+                             onKeyDown={(e) => {
+                                if (e.key === 'Enter' && searchResults.length === 1) {
+                                   handleProductSelect(searchResults[0]);
+                                }
+                             }}
+                           />
+                           
+                           {/* Search Results Dropdown */}
+                           {searchResults.length > 0 && (
+                             <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded shadow-xl z-[60] max-h-60 overflow-auto">
+                               {searchResults.map(p => (
+                                 <button 
+                                   key={p.id}
+                                   onClick={() => handleProductSelect(p)}
+                                   className="w-full p-2 hover:bg-slate-50 border-b border-slate-100 last:border-0 flex items-center justify-between text-left"
+                                 >
+                                   <div>
+                                      <div className="text-[9px] font-black text-slate-900 uppercase">{p.name}</div>
+                                      <div className="text-[7px] text-slate-400 font-bold uppercase">{p.barcode}</div>
+                                   </div>
+                                   <div className="text-[9px] font-black text-indigo-600 italic">
+                                      STK: {p.stock_quantity}
+                                   </div>
+                                 </button>
+                               ))}
+                             </div>
+                           )}
+                        </div>
+
+                        <div className="relative w-48">
+                           <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                           <input 
+                             type="text"
+                             placeholder="FILTER_TABLE..."
+                             className="w-full bg-white border border-slate-200 rounded pl-9 py-2 text-[9px] font-black italic outline-none"
+                             value={tableSearchQuery}
+                             onChange={(e) => setTableSearchQuery(e.target.value)}
+                           />
+                        </div>
                     </div>
+                    
+                    {selectedProduct && (
+                      <div className="flex items-center gap-2 bg-indigo-600 p-1 rounded shadow-lg animate-in fade-in slide-in-from-right-4 duration-300">
+                        <div className="px-2">
+                           <div className="text-[8px] font-black text-indigo-100 uppercase leading-none mb-1">EDITING_QTY:</div>
+                           <div className="text-[9px] font-black text-white uppercase leading-none">{selectedProduct.name}</div>
+                        </div>
+                        <input 
+                          type="number"
+                          value={physicalCount}
+                          onChange={(e) => setPhysicalCount(e.target.value)}
+                          autoFocus
+                          className="w-16 bg-white border-0 rounded px-2 py-1.5 text-[10px] font-black outline-none"
+                        />
+                        <button 
+                           onClick={addOrUpdateItem}
+                           className="bg-emerald-500 text-white px-3 py-1.5 rounded text-[9px] font-black hover:bg-emerald-600 transition-colors"
+                        >
+                           SAVE
+                        </button>
+                        <button 
+                           onClick={() => {
+                              setSelectedProduct(null);
+                              setPhysicalCount('');
+                           }} 
+                           className="p-1.5 text-white/60 hover:text-white transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                  </div>
-
-                 {selectedProduct && (
-                    <div className="bg-slate-50 border border-indigo-500/20 rounded p-4 animate-in fade-in slide-in-from-top-2">
-                       <div className="text-[10px] font-black text-slate-900 uppercase mb-2 flex items-center justify-between border-b border-slate-200 pb-2">
-                          <span>{selectedProduct.name}</span>
-                          <span className="text-slate-400 font-bold">{selectedProduct.barcode}</span>
-                       </div>
-                       
-                       <div className="flex items-center justify-between mb-4 mt-2">
-                          <div className="text-center bg-white p-2 rounded border border-slate-200 flex-1 mr-2">
-                             <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">SYSTEM_VAL</div>
-                             <div className="text-[14px] font-black text-slate-900">{selectedProduct.stock_quantity}</div>
-                          </div>
-                          <div className="text-center font-black text-slate-400">vs</div>
-                          <div className="flex-1 ml-2">
-                             <div className="text-[7px] font-black text-indigo-600 uppercase tracking-widest mb-1 text-center">PHYSICAL_ACT</div>
-                             <input 
-                               type="number"
-                               placeholder="COUNT"
-                               className="w-full bg-white border border-indigo-200 rounded py-2 text-center text-[18px] font-black outline-none focus:ring-1 focus:ring-indigo-500 no-spinner text-indigo-600"
-                               value={physicalCount}
-                               onChange={(e) => setPhysicalCount(e.target.value)}
-                               autoFocus
-                               onKeyDown={(e) => {
-                                 if (e.key === 'Enter') addOrUpdateItem();
-                               }}
-                             />
-                          </div>
-                       </div>
-                       
-                       <button 
-                         onClick={addOrUpdateItem}
-                         disabled={physicalCount === ''}
-                         className="w-full bg-indigo-600 text-white font-black py-2.5 rounded shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-[9px] uppercase tracking-widest disabled:opacity-30"
-                       >
-                         <Check className="w-3.5 h-3.5" /> SAVE_COUNT
-                       </button>
-                    </div>
-                 )}
-              </div>
-
-              <div className="mt-auto bg-slate-900 rounded p-4 text-white shadow-2xl">
-                 <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 border-b border-white/5 pb-2">SESSION_SUMMARY</h4>
-                 <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                       <span className="text-slate-400 font-bold uppercase tracking-wider text-[8px]">ITEMS_SCANNED</span>
-                       <span className="font-black text-[12px] italic">{sessionItems.length}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                       <span className="text-slate-400 font-bold uppercase tracking-wider text-[8px]">TOTAL_VARIANCE</span>
-                       <span className={`font-black text-[12px] italic ${sessionItems.reduce((acc, i) => acc + i.difference, 0) < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                         {sessionItems.reduce((acc, i) => acc + i.difference, 0) > 0 ? '+' : ''}{sessionItems.reduce((acc, i) => acc + i.difference, 0)}
-                       </span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-white/5">
-                       <span className="text-indigo-400 font-bold uppercase tracking-wider text-[8px]">VALUE_DELTA ({currency.code})</span>
-                       <span className={`font-black text-[14px] italic ${sessionItems.reduce((acc, i) => acc + i.value_difference, 0) < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                         {currency.symbol}{sessionItems.reduce((acc, i) => acc + i.value_difference, 0).toFixed(2)}
-                       </span>
-                    </div>
-                 </div>
-              </div>
-           </div>
-
-           {/* Main Area: Item List */}
-           <div className="flex-1 p-6 overflow-auto">
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full border-t-2 border-t-indigo-500">
-                 <table className="w-full text-left">
-                    <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200">
-                       <tr className="text-[7px] font-black text-slate-400 uppercase tracking-widest">
-                          <th className="px-6 py-3">ASSET_IDENTIFIER</th>
-                          <th className="px-6 py-3 text-center">SYSTEM_STOCK</th>
-                          <th className="px-6 py-3 text-center">PHYSICAL_COUNT</th>
-                          <th className="px-6 py-3 text-center">VARIANCE</th>
-                          <th className="px-6 py-3 text-right">VALUE_DIFF</th>
-                          <th className="px-6 py-3"></th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                       {sessionItems.length === 0 ? (
-                          <tr>
-                             <td colSpan={6} className="py-32 text-center text-slate-400 font-black uppercase tracking-[0.5em] opacity-30">
-                                NO_DATA_STREAM_CAPTURED
-                             </td>
-                          </tr>
-                       ) : (
-                          sessionItems.map(item => (
-                             <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                                <td className="px-6 py-4">
-                                   <div className="font-black text-slate-900 uppercase text-[10px] tracking-tight">{item.name}</div>
-                                   <div className="text-[7px] text-slate-400 font-bold tracking-[0.2em] mt-0.5">{item.barcode}</div>
-                                </td>
-                                <td className="px-6 py-4 text-center font-bold text-slate-500 italic">
-                                   {item.system_stock}
-                                </td>
-                                <td className="px-6 py-4 text-center font-black text-indigo-600 italic">
-                                   {item.physical_stock}
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                   <span className={`px-2 py-0.5 rounded text-[8px] font-black italic tracking-widest ${
- item.difference === 0 ? 'bg-slate-100 text-slate-500' :
- item.difference > 0 ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
- 'bg-red-500/10 text-red-600 border border-red-500/20'
- }`}>
-                                     {item.difference > 0 ? '+' : ''}{item.difference}
-                                   </span>
-                                </td>
-                                <td className={`px-6 py-4 text-right font-black italic ${item.value_difference < 0 ? 'text-red-500' : item.value_difference > 0 ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                   {currency.symbol}{item.value_difference.toFixed(2)}
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                   <button 
-                                     onClick={() => handleItemDeleteClick(item.id)}
-                                     className="text-slate-400 hover:text-red-500 transition-colors"
-                                     title="Delete Item"
-                                   >
-                                     <Trash2 className="w-3.5 h-3.5" />
-                                   </button>
-                                </td>
-                             </tr>
-                          ))
-                       )}
-                    </tbody>
-                 </table>
-              </div>
-           </div>
+                   <table className="w-full text-left">
+                      <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200">
+                         <tr className="text-[7px] font-black text-slate-400 uppercase tracking-widest">
+                            <th className="px-6 py-3">ASSET_IDENTIFIER</th>
+                            <th className="px-6 py-3 text-center">SYSTEM_STOCK</th>
+                            <th className="px-6 py-3 text-center">PHYSICAL_COUNT</th>
+                            <th className="px-6 py-3 text-center">VARIANCE</th>
+                            <th className="px-6 py-3 text-right">VALUE_DIFF</th>
+                            <th className="px-6 py-3"></th>
+                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                         {sessionItems.length === 0 ? (
+                            <tr>
+                               <td colSpan={6} className="py-32 text-center text-slate-400 font-black uppercase tracking-[0.5em] opacity-30">
+                                  NO_DATA_STREAM_CAPTURED
+                               </td>
+                            </tr>
+                         ) : (
+                            sessionItems
+                              .filter(i => i.name.toLowerCase().includes(tableSearchQuery.toLowerCase()) || i.barcode.includes(tableSearchQuery))
+                              .map(item => (
+                               <tr key={item.id} className={`${editingItemId === item.id ? 'bg-indigo-50/50' : 'hover:bg-slate-50'} transition-colors group`}>
+                                  <td className="px-6 py-4">
+                                     <div className="font-black text-slate-900 uppercase text-[10px] tracking-tight">{item.name}</div>
+                                     <div className="text-[7px] text-slate-400 font-bold tracking-[0.2em] mt-0.5">{item.barcode}</div>
+                                  </td>
+                                  <td className="px-6 py-4 text-center font-bold text-slate-500 italic">
+                                     {item.system_stock}
+                                  </td>
+                                  <td className="px-6 py-4 text-center font-black text-indigo-600 italic">
+                                     {editingItemId === item.id ? (
+                                        <input 
+                                          type="number"
+                                          value={editingPhysicalCount}
+                                          onChange={(e) => setEditingPhysicalCount(e.target.value)}
+                                          autoFocus
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') addOrUpdateItem(true);
+                                            if (e.key === 'Escape') setEditingItemId(null);
+                                          }}
+                                          className="w-20 bg-white border border-indigo-200 rounded px-2 py-1 text-[10px] font-black outline-none focus:ring-2 focus:ring-indigo-500/20 text-center mx-auto"
+                                        />
+                                     ) : (
+                                        item.physical_stock
+                                     )}
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                     <span className={`px-2 py-0.5 rounded text-[8px] font-black italic tracking-widest ${
+                                        item.difference === 0 ? 'bg-slate-100 text-slate-500' :
+                                        item.difference > 0 ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                                        'bg-red-500/10 text-red-600 border border-red-500/20'
+                                     }`}>
+                                       {item.difference > 0 ? '+' : ''}{item.difference}
+                                     </span>
+                                  </td>
+                                  <td className={`px-6 py-4 text-right font-black italic ${item.value_difference < 0 ? 'text-red-500' : item.value_difference > 0 ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                     {currency.symbol}{item.value_difference.toFixed(2)}
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                     <div className="flex items-center justify-end gap-3">
+                                        {editingItemId === item.id ? (
+                                           <>
+                                              <button 
+                                                onClick={() => addOrUpdateItem(true)}
+                                                className="text-emerald-500 hover:text-emerald-600 transition-colors"
+                                                title="Save Changes"
+                                              >
+                                                <Check className="w-4 h-4" />
+                                              </button>
+                                              <button 
+                                                onClick={() => setEditingItemId(null)}
+                                                className="text-slate-400 hover:text-red-500 transition-colors"
+                                                title="Cancel"
+                                              >
+                                                <X className="w-4 h-4" />
+                                              </button>
+                                           </>
+                                        ) : (
+                                           <>
+                                              <button 
+                                                onClick={() => {
+                                                   setEditingItemId(item.id);
+                                                   setEditingPhysicalCount(item.physical_stock.toString());
+                                                }}
+                                                className="text-slate-400 hover:text-indigo-500 transition-colors"
+                                                title="Edit Item"
+                                              >
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button 
+                                                onClick={() => handleItemDeleteClick(item.id)}
+                                                className="text-slate-400 hover:text-red-500 transition-colors"
+                                                title="Delete Item"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                           </>
+                                        )}
+                                     </div>
+                                  </td>
+                               </tr>
+                            ))
+                         )}
+                      </tbody>
+                      <tfoot className="bg-slate-50 border-t border-slate-200">
+                         <tr className="text-[8px] font-black text-slate-900 uppercase tracking-widest">
+                           <td className="px-6 py-4">TOTAL</td>
+                           <td className="px-6 py-4 text-center">{sessionItems.reduce((s, i) => s + i.system_stock, 0)}</td>
+                           <td className="px-6 py-4 text-center">{sessionItems.reduce((s, i) => s + i.physical_stock, 0)}</td>
+                           <td className="px-6 py-4 text-center">{sessionItems.reduce((s, i) => s + i.difference, 0)}</td>
+                           <td className="px-6 py-4 text-right">{currency.symbol}{sessionItems.reduce((s, i) => s + i.value_difference, 0).toFixed(2)}</td>
+                           <td></td>
+                         </tr>
+                      </tfoot>
+                   </table>
+                </div>
+             </div>
+          </div>
         </div>
-      </div>
+        
+        <ConfirmModal 
+          isOpen={sessionToDelete !== null}
+          onClose={() => setSessionToDelete(null)}
+          onConfirm={confirmDeleteSession}
+          title="DELETE_AUDIT_SESSION"
+          message={`ARE_YOU_ABSOLUTELY_SURE_TO_PURGE_SESSION_#${sessionToDelete}?_THIS_ACTION_CANNOT_BE_REVERSED.`}
+        />
+
+        <ConfirmModal 
+          isOpen={itemToDelete !== null}
+          onClose={() => setItemToDelete(null)}
+          onConfirm={confirmDeleteItem}
+          title="PURGE_RECORD"
+          message="REMOVING_THIS_ASSET_DISCREPANCY_RECORD_FROM_CURRENT_BUFFER._PROCEED?"
+        />
+      </>
     );
   }
 
@@ -648,6 +790,16 @@ export default function InventoryAudit() {
                            </tr>
                         ))}
                      </tbody>
+                     <tfoot className="bg-slate-50 border-t border-slate-200">
+                        <tr className="text-[8px] font-black text-slate-900 uppercase tracking-widest">
+                          <td className="px-6 py-4">TOTAL_HISTORY</td>
+                          <td className="px-6 py-4"></td>
+                          <td className="px-6 py-4"></td>
+                          <td className="px-6 py-4 text-center">---</td>
+                          <td className="px-6 py-4 text-right">{currency.symbol}{sessions.reduce((s, row) => s + (row.status === 'COMPLETED' ? (row.total_difference || 0) : 0), 0).toFixed(2)}</td>
+                          <td></td>
+                        </tr>
+                     </tfoot>
                   </table>
                </div>
             </div>

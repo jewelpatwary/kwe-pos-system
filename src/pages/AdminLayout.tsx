@@ -44,6 +44,7 @@ export default function AdminLayout() {
       label: "INVENTORY",
       items: [
         { to: "/admin/products", label: "PRODUCTS", icon: ShoppingBag },
+        { to: "/admin/expiry-insights", label: "EXPIRY INSIGHTS", icon: ShieldAlert },
         { to: "/admin/returns", label: "RETURNS", icon: Undo2 },
         { to: "/admin/return-history", label: "RET. HISTORY", icon: History },
         { to: "/admin/labels", label: "LABELS", icon: Printer }
@@ -70,8 +71,8 @@ export default function AdminLayout() {
       id: "entities",
       label: "CUSTOMERS",
       items: [
-        { to: "/admin/customers", label: "MEMBERS", icon: Users },
-        { to: "/admin/credit-customers", label: "CREDIT MEMBERS", icon: CreditCard },
+        { to: "/admin/customers", label: "MEMBERS (DELIVERY FOOD)", icon: Users },
+        { to: "/admin/credit-customers", label: "MEMBERS (WALK IN)", icon: CreditCard },
         { to: "/admin/credit-collections", label: "COLLECTIONS", icon: Banknote },
         { to: "/admin/credit-engine", label: "ENGINE", icon: CreditCard }
       ]

@@ -12,6 +12,9 @@ export default function Customers() {
   const [showForm, setShowForm] = useState(false);
   const [showPaymentFor, setShowPaymentFor] = useState<any>(null);
   const [showManageCredit, setShowManageCredit] = useState<any>(null);
+  const [showAutoBurnLogs, setShowAutoBurnLogs] = useState<any>(null);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [autoBurnHistory, setAutoBurnHistory] = useState<any[]>([]);
   const [creditHistory, setCreditHistory] = useState<any[]>([]);
   const [statusLogs, setStatusLogs] = useState<any[]>([]);
   const [showSettings, setShowSettings] = useState(false);
@@ -20,8 +23,33 @@ export default function Customers() {
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
-    id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', daily_limit: '0', monthly_limit: '0', status: 'active', credit_status: 'ACTIVE', auto_sale_cfg: false
+    id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', 
+    daily_limit: '0', daily_limit_mode: 'MANUAL', monthly_limit: '0', 
+    total_pax: '1', total_monthly_limit: '0',
+    status: 'active', credit_status: 'ACTIVE', auto_sale_cfg: false,
+    working_place: '', emp_id: '', passport_no: '', auto_burn: false, auto_burn_start_date: '', auto_burn_stop_date: ''
   });
+
+  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+
+  useEffect(() => {
+    const pax = parseFloat(formData.total_pax) || 1;
+    const mLimit = parseFloat(formData.monthly_limit) || 0;
+    const totalMLimit = (pax * mLimit).toFixed(2);
+
+    let nextDailyLimit = formData.daily_limit;
+    if (formData.daily_limit_mode === 'AUTO') {
+      const now = new Date();
+      const days = getDaysInMonth(now.getFullYear(), now.getMonth());
+      nextDailyLimit = (parseFloat(totalMLimit) / days).toFixed(2);
+    }
+
+    setFormData(prev => ({ 
+      ...prev, 
+      total_monthly_limit: totalMLimit,
+      daily_limit: nextDailyLimit
+    }));
+  }, [formData.monthly_limit, formData.total_pax, formData.daily_limit_mode]);
 
   // Import States
   const [showImportModal, setShowImportModal] = useState(false);
@@ -35,7 +63,7 @@ export default function Customers() {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/customers', { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch('/api/customers?type=DELIVERY', { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
       if (data.success) setCustomers(data.data);
     } catch (err) { console.error(err); }
@@ -70,7 +98,10 @@ export default function Customers() {
           credit_limit: Number(formData.credit_limit), 
           daily_limit: Number(formData.daily_limit),
           monthly_limit: Number(formData.monthly_limit),
-          auto_sale_cfg: formData.auto_sale_cfg
+          total_pax: Number(formData.total_pax || 1),
+          total_monthly_limit: Number(formData.total_monthly_limit || 0),
+          auto_sale_cfg: formData.auto_sale_cfg,
+          member_type: 'DELIVERY'
         })
       });
       const data = await res.json();
@@ -110,9 +141,18 @@ export default function Customers() {
       credit_limit: (c.credit_limit || 0).toString(),
       daily_limit: (c.daily_limit || 0).toString(),
       monthly_limit: (c.monthly_limit || 0).toString(),
+      daily_limit_mode: c.daily_limit_mode || 'MANUAL',
+      total_pax: (c.total_pax || 1).toString(),
+      total_monthly_limit: (c.total_monthly_limit || 0).toString(),
       status: c.status,
       credit_status: c.credit_status || 'ACTIVE',
-      auto_sale_cfg: c.auto_sale_cfg === 1
+      auto_sale_cfg: c.auto_sale_cfg === 1,
+      working_place: c.working_place || '',
+      emp_id: c.emp_id || '',
+      passport_no: c.passport_no || '',
+      auto_burn: !!c.auto_burn,
+      auto_burn_start_date: c.auto_burn_start_date ? c.auto_burn_start_date.split('T')[0] : '',
+      auto_burn_stop_date: c.auto_burn_stop_date ? c.auto_burn_stop_date.split('T')[0] : ''
     });
     setShowForm(true);
   };
@@ -143,6 +183,15 @@ export default function Customers() {
       if (logsData.success) setStatusLogs(logsData.data);
     } catch (err) { console.error(err); }
   };
+
+  const fetchAutoBurnData = async (customerId: any) => {
+    try {
+        const res = await fetch(`/api/customers/${customerId}/auto-burn-logs`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        if (data.success) setAutoBurnHistory(data.data);
+    } catch (err) { console.error(err); }
+  };
+
 
   const updateCreditStatus = async (customerId: any, newStatus: string) => {
     const reason = prompt(`Reason for changing status to ${newStatus}:`);
@@ -225,12 +274,19 @@ export default function Customers() {
             </button>
             <button 
                 onClick={() => {
-                   setFormData({ id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', daily_limit: '0', monthly_limit: '0', status: 'active', credit_status: 'ACTIVE', auto_sale_cfg: false });
+                   setFormData({ 
+                     id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', 
+                     daily_limit: '0', daily_limit_mode: 'MANUAL', monthly_limit: '0', 
+                     total_pax: '1', total_monthly_limit: '0',
+                     status: 'active', credit_status: 'ACTIVE', auto_sale_cfg: false,
+                     working_place: '', emp_id: '', passport_no: '', 
+                     auto_burn: false, auto_burn_start_date: '', auto_burn_stop_date: '' 
+                   });
                    setShowForm(true);
                 }}
                 className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-500/10"
             >
-                <Plus className="w-3.5 h-3.5" /> Add Member
+                <Plus className="w-3.5 h-3.5" /> Add Member (Delivery food)
             </button>
         </div>
       </div>
@@ -244,16 +300,29 @@ export default function Customers() {
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200">
               <tr className="text-slate-500 bg-slate-50/80 backdrop-blur-md transition-colors">
-                <th className="py-4 px-6 font-black border-r border-slate-200">Member Name</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Card & Contact</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Credit Limits</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Balance</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">EMP ID</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">Member Profile</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">Occupation</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">Passport No</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">RFID Number</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">Contact Number</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Total Limit</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Monthly Limit</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Daily Limit</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Auto Burn Status</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Start Date</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">End Date</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Auto Burn Total</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Balance</th>
                 <th className="py-4 px-6 font-black text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 transition-colors">
               {filtered.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
+                  <td className="py-4 px-6 border-r border-slate-100 font-black text-slate-400">
+                    <div className="flex items-center gap-1.5">{c.emp_id || '-'}</div>
+                  </td>
                   <td className="py-4 px-6 border-r border-slate-100">
                     <div className="text-slate-900 font-black">{c.name}</div>
                     <div className="flex gap-2 mt-0.5">
@@ -263,15 +332,41 @@ export default function Customers() {
                     </div>
                   </td>
                   <td className="py-4 px-6 border-r border-slate-100 font-black text-slate-400">
-                    <div className="flex items-center gap-1.5"><span className="text-slate-300">RFID:</span> {c.rfid_card || 'NONE'}</div>
-                    <div className="flex items-center gap-1.5"><span className="text-slate-300">TEL:</span> {c.phone || 'NONE'}</div>
+                    <div className="flex items-center gap-1.5">{c.working_place || '-'}</div>
                   </td>
-                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-slate-500">
-                    <div className="grid grid-cols-2 gap-x-4">
-                        <span>MONTHLY: <span className="text-slate-900">{currency.symbol}{c.monthly_limit}</span></span>
-                        <span>DAILY: <span className="text-slate-900">{currency.symbol}{c.daily_limit}</span></span>
-                        <span className="col-span-2">TOTAL LIMIT: <span className="text-teal-600 font-black">{currency.symbol}{c.credit_limit}</span></span>
+                  <td className="py-4 px-6 border-r border-slate-100 font-black text-slate-400">
+                    <div className="flex items-center gap-1.5">{c.passport_no || '-'}</div>
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-black text-indigo-600">
+                    {c.rfid_card || 'NONE'}
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-black text-slate-700">
+                    {c.phone || 'NONE'}
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-center">
+                    <span className="text-teal-600 font-black">{currency.symbol}{c.credit_limit}</span>
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-center">
+                    <span className="text-slate-900">{currency.symbol}{c.monthly_limit}</span>
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-center">
+                    <span className="text-slate-900">{currency.symbol}{c.daily_limit}</span>
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-black text-slate-400 text-center">
+                    <div className="flex justify-center">
+                      <span className={`px-2 py-0.5 rounded text-[8px] tracking-widest w-fit ${c.auto_burn ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {c.auto_burn ? 'ENABLED' : 'DISABLED'}
+                      </span>
                     </div>
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-center text-slate-500">
+                    {c.auto_burn && c.auto_burn_start_date ? new Date(c.auto_burn_start_date).toLocaleDateString() : '-'}
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-center text-slate-500">
+                    {c.auto_burn && c.auto_burn_stop_date ? new Date(c.auto_burn_stop_date).toLocaleDateString() : '-'}
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-center">
+                      <button onClick={() => { setShowAutoBurnLogs(c); fetchAutoBurnData(c.id); }} className="text-indigo-600 hover:text-indigo-800 font-black text-[9px] underline underline-offset-2">VIEW_LOGS</button>
                   </td>
                   <td className="py-4 px-6 border-r border-slate-100">
                     <div className={c.current_balance > 0 ? 'text-red-600  font-black' : 'text-emerald-600  font-black'}>
@@ -295,7 +390,7 @@ export default function Customers() {
               ))}
               {filtered.length === 0 && !loading && (
                 <tr>
-                   <td colSpan={5} className="py-20 text-center font-black text-slate-300 tracking-[0.5em]">NO MEMBERS FOUND</td>
+                   <td colSpan={15} className="py-20 text-center font-black text-slate-300 tracking-[0.5em]">NO MEMBERS FOUND</td>
                 </tr>
               )}
             </tbody>
@@ -304,7 +399,7 @@ export default function Customers() {
       </div>
 
       <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div>MEMBER DIRECTORY • {customers.length} REGISTERED MEMBERS</div>
+         <div>MEMBERS (DELIVERY FOOD) DIRECTORY • {customers.length} REGISTERED MEMBERS</div>
          <div>SYSTEM ACTIVE • {new Date().toISOString()}</div>
       </div>
 
@@ -312,14 +407,14 @@ export default function Customers() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 bg-slate-900/40 backdrop-blur-sm">
            <div className="w-full max-w-2xl bg-white border border-slate-200 rounded flex flex-col relative animate-in fade-in zoom-in-95 shadow-2xl">
               <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between rounded-t">
-                 <h2 className="text-slate-800 font-black">{formData.id ? 'Edit Member' : 'Add New Member'}</h2>
+                 <h2 className="text-slate-800 font-black">{formData.id ? 'Edit Member (Delivery food)' : 'Add New Member (Delivery food)'}</h2>
                  <button onClick={() => setShowForm(false)} className="p-1 hover:bg-slate-200 text-slate-500 transition-colors rounded"><X size={16}/></button>
               </div>
               <div className="p-6 overflow-auto max-h-[80vh]">
                  <form id="customerForm" onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                         <label className="text-slate-500 text-[9px] font-black uppercase">Full Name</label>
-                        <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                        <input type="text" required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
                     </div>
                     <div className="space-y-1 relative group">
                         <label className="text-slate-500 text-[9px] font-black uppercase flex justify-between items-center">
@@ -331,7 +426,7 @@ export default function Customers() {
                         <input 
                             id="rfid_input" 
                             type="text" 
-                            value={formData.rfid_card} 
+                            value={formData.rfid_card || ''} 
                             onChange={e => setFormData({...formData, rfid_card: e.target.value})} 
                             onKeyDown={(e) => { if(e.key === 'Enter'){ e.preventDefault(); e.currentTarget.blur(); } }} 
                             placeholder="Select and scan card..." 
@@ -340,20 +435,84 @@ export default function Customers() {
                     </div>
                     <div className="space-y-1">
                         <label className="text-slate-500 text-[9px] font-black uppercase">Phone Number</label>
-                        <input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                        <input type="text" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
                     </div>
                     <div className="space-y-1">
                         <label className="text-slate-500 text-[9px] font-black uppercase">Total Credit Limit</label>
-                        <input type="number" step="0.01" value={formData.credit_limit} onChange={e => setFormData({...formData, credit_limit: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-bold bg-white" />
+                        <input type="number" step="0.01" value={formData.credit_limit || ''} onChange={e => setFormData({...formData, credit_limit: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-bold bg-white" />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-slate-500 text-[9px] font-black uppercase">Monthly Limit</label>
-                        <input type="number" step="0.01" value={formData.monthly_limit} onChange={e => setFormData({...formData, monthly_limit: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-bold bg-white" />
+                        <label className="text-slate-500 text-[9px] font-black uppercase">Monthly Limit Per Pax</label>
+                        <input type="number" step="0.01" value={formData.monthly_limit || ''} onChange={e => setFormData({...formData, monthly_limit: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-bold bg-white" />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-slate-500 text-[9px] font-black uppercase">Daily Limit</label>
-                        <input type="number" step="0.01" value={formData.daily_limit} onChange={e => setFormData({...formData, daily_limit: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-bold bg-white" />
+                        <label className="text-slate-500 text-[9px] font-black uppercase">Total Pax</label>
+                        <input type="number" value={formData.total_pax || '1'} onChange={e => setFormData({...formData, total_pax: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-bold bg-white" />
                     </div>
+                    <div className="space-y-1">
+                        <label className="text-slate-500 text-[9px] font-black uppercase">Total Monthly Limit</label>
+                        <input type="number" readOnly value={formData.total_monthly_limit || ''} className="w-full border border-slate-200 text-indigo-600 px-3 py-1.5 rounded outline-none bg-slate-50 font-black" />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-slate-500 text-[9px] font-black uppercase flex justify-between">
+                            <span>Daily Limit</span>
+                            <div className="flex gap-2">
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="radio" className="w-2.5 h-2.5" checked={formData.daily_limit_mode === 'AUTO'} onChange={() => setFormData({...formData, daily_limit_mode: 'AUTO'})} />
+                                    <span className="text-[7px]">AUTO</span>
+                                </label>
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="radio" className="w-2.5 h-2.5" checked={formData.daily_limit_mode === 'MANUAL'} onChange={() => setFormData({...formData, daily_limit_mode: 'MANUAL'})} />
+                                    <span className="text-[7px]">MANUAL</span>
+                                </label>
+                            </div>
+                        </label>
+                        <input 
+                            type="number" step="0.01" 
+                            readOnly={formData.daily_limit_mode === 'AUTO'}
+                            value={formData.daily_limit || ''} 
+                            onChange={e => setFormData({...formData, daily_limit: e.target.value})} 
+                            className={`w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-bold ${formData.daily_limit_mode === 'AUTO' ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : 'bg-white'}`} 
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-slate-500 text-[9px] font-black uppercase">Working Place</label>
+                        <input type="text" value={formData.working_place || ''} onChange={e => setFormData({...formData, working_place: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-slate-500 text-[9px] font-black uppercase">Employee ID</label>
+                        <input type="text" value={formData.emp_id || ''} onChange={e => setFormData({...formData, emp_id: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-slate-500 text-[9px] font-black uppercase">Passport No</label>
+                        <input type="text" value={formData.passport_no || ''} onChange={e => setFormData({...formData, passport_no: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                    </div>
+                    <div className="space-y-1 col-span-2 mt-2">
+                        <label className="flex items-center gap-2 cursor-pointer p-2 border border-slate-200 rounded hover:bg-slate-50 transition-colors select-none">
+                            <input 
+                                type="checkbox" 
+                                checked={formData.auto_burn} 
+                                onChange={e => setFormData({...formData, auto_burn: e.target.checked})} 
+                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                            />
+                            <div className="flex flex-col">
+                                <span className="text-slate-800 text-[11px] font-black uppercase">Auto Burn</span>
+                                <span className="text-slate-500 text-[9px]">Enable auto deduction mode for this member</span>
+                            </div>
+                        </label>
+                    </div>
+                    {formData.auto_burn && (
+                        <>
+                            <div className="space-y-1">
+                                <label className="text-slate-500 text-[9px] font-black uppercase">Auto Burn Start Date</label>
+                                <input type="date" value={formData.auto_burn_start_date || ''} onChange={e => setFormData({...formData, auto_burn_start_date: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-slate-500 text-[9px] font-black uppercase">Auto Burn Stop Date</label>
+                                <input type="date" value={formData.auto_burn_stop_date || ''} onChange={e => setFormData({...formData, auto_burn_stop_date: e.target.value})} className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                            </div>
+                        </>
+                    )}
                     <div className="space-y-1 col-span-2 mt-2">
                         <label className="flex items-center gap-2 cursor-pointer p-2 border border-slate-200 rounded hover:bg-slate-50 transition-colors select-none">
                             <input 
@@ -400,27 +559,27 @@ export default function Customers() {
       )}
 
       {showPaymentFor && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 bg-[#0f1117]/90 backdrop-blur-sm">
-           <div className="w-full max-w-sm bg-[#181a20] border border-[#2d303b] rounded shadow-2xl relative animate-in fade-in zoom-in-95">
-              <div className="p-3 border-b border-[#2d303b] bg-[#1c1f26] flex items-center justify-between">
-                 <span className="font-black text-white">Payment Settlement</span>
-                 <button onClick={() => setShowPaymentFor(null)} className="text-slate-500 hover:text-white transition"><X size={16}/></button>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+           <div className="w-full max-w-sm bg-white border border-slate-200 rounded shadow-2xl relative animate-in fade-in zoom-in-95">
+              <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                 <span className="font-black text-slate-900">Payment Settlement</span>
+                 <button onClick={() => setShowPaymentFor(null)} className="text-slate-400 hover:text-slate-700 transition"><X size={16}/></button>
               </div>
               <div className="p-6">
-                 <div className="mb-6 p-4 bg-[#0f1117] border border-[#2d303b] text-center">
+                 <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded text-center">
                     <span className="text-slate-500 font-black text-[8px] uppercase tracking-widest block mb-1">Current Debt</span>
-                    <span className="text-2xl font-black text-red-500 italictracking-tighter">{currency.symbol}{showPaymentFor.current_balance.toFixed(2)}</span>
+                    <span className="text-2xl font-black text-red-600 italic tracking-tighter">{currency.symbol}{showPaymentFor.current_balance.toFixed(2)}</span>
                  </div>
                  <div className="space-y-4">
                     <div className="space-y-1 text-center">
                        <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Payment Amount</label>
                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 font-black">{currency.symbol}</span>
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 font-black">{currency.symbol}</span>
                           <input 
                             type="number" step="0.01" 
                             value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} 
                             autoFocus 
-                            className="w-full bg-[#2d303b] border-[#3b404d] text-white pl-8 pr-4 py-3 rounded outline-none focus:ring-1 focus:ring-emerald-500 text-xl font-black text-center" 
+                            className="w-full bg-slate-50 border border-slate-200 text-slate-900 pl-8 pr-4 py-3 rounded outline-none focus:ring-1 focus:ring-emerald-500 text-xl font-black text-center" 
                           />
                        </div>
                     </div>
@@ -431,81 +590,122 @@ export default function Customers() {
         </div>
       )}
 
-      {showManageCredit && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 bg-[#0f1117]/90 backdrop-blur-md">
-           <div className="w-full max-w-5xl h-[85vh] bg-[#181a20] border border-[#2d303b] rounded shadow-2xl flex flex-col relative animate-in fade-in slide-in-from-bottom-4">
-               <div className="p-3 border-b border-[#2d303b] bg-[#1c1f26] flex items-center justify-between">
-                  <div className="flex gap-4 items-center">
-                     <span className="font-black text-white px-3 py-1 bg-indigo-600/20 border border-indigo-500/30 rounded">Member Credit Audit : {showManageCredit.name}</span>
-                     <span className={`text-[8px] font-black italic underline decoration-offset-4 ${showManageCredit.credit_status === 'ACTIVE' ? 'text-emerald-400 decoration-emerald-900' : 'text-red-400 decoration-red-900'}`}>{showManageCredit.credit_status}</span>
+      {showAutoBurnLogs && (() => {
+        const filteredLogs = autoBurnHistory.filter(h => h.created_at.startsWith(selectedMonth));
+        return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 bg-slate-900/40 backdrop-blur-md">
+           <div className="w-full max-w-3xl h-[80vh] bg-white border border-slate-200 rounded shadow-2xl flex flex-col relative animate-in fade-in slide-in-from-bottom-4">
+               <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                  <span className="font-black text-slate-900 px-3 py-1 bg-indigo-50 border border-indigo-100 rounded">Auto Burn Audit Logs : {showAutoBurnLogs.name}</span>
+                  <div className="flex items-center gap-2">
+                     <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="text-[10px] p-1 border rounded" />
+                     <button onClick={() => setShowAutoBurnLogs(null)} className="text-slate-500 hover:text-slate-900 transition"><X size={18}/></button>
                   </div>
-                  <button onClick={() => setShowManageCredit(null)} className="text-slate-500 hover:text-white transition"><X size={18}/></button>
+               </div>
+               <div className="flex-1 overflow-auto p-4 custom-scrollbar">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 text-slate-500 text-[9px] font-black uppercase">
+                        <tr>
+                            <th className="p-2 border-b border-slate-200">Date</th>
+                            <th className="p-2 border-b border-slate-200">Amount</th>
+                            <th className="p-2 border-b border-slate-200">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                        {filteredLogs.map((h, i) => (
+                            <tr key={i} className="text-[9px] text-slate-700 font-black tracking-widest">
+                                <td className="p-2">{new Date(h.created_at).toLocaleString()}</td>
+                                <td className="p-2 text-indigo-600">{currency.symbol}{Number(h.amount).toFixed(2)}</td>
+                                <td className="p-2">{h.status}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                  {filteredLogs.length === 0 && <div className="py-20 text-center text-slate-400 tracking-[0.5em] font-black">NO AUTO BURN LOGS FOUND FOR THIS MONTH</div>}
+               </div>
+               <div className="p-3 border-t border-slate-200 bg-slate-50 text-right">
+                    <span className="text-slate-900 font-black tracking-widest">TOTAL BURNED: {currency.symbol}{filteredLogs.reduce((s, h) => s + Number(h.amount), 0).toFixed(2)}</span>
+               </div>
+           </div>
+        </div>
+        );
+      })()}
+
+      {showManageCredit && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+           <div className="w-full max-w-5xl h-[85vh] bg-white border border-slate-200 rounded shadow-2xl flex flex-col relative animate-in fade-in slide-in-from-bottom-4">
+               <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                  <div className="flex gap-4 items-center">
+                     <span className="font-black text-slate-900 px-3 py-1 bg-indigo-50 border border-indigo-100 rounded">Member Credit Audit : {showManageCredit.name}</span>
+                     <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${showManageCredit.credit_status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{showManageCredit.credit_status}</span>
+                  </div>
+                  <button onClick={() => setShowManageCredit(null)} className="text-slate-400 hover:text-slate-900 transition"><X size={18}/></button>
                </div>
                
                <div className="flex-1 overflow-hidden grid grid-cols-12">
                    {/* Left Panel: Control */}
-                   <div className="col-span-3 border-r border-[#2d303b] p-4 space-y-6 flex flex-col bg-[#1c1f26]/20">
+                   <div className="col-span-3 border-r border-slate-200 p-4 space-y-6 flex flex-col bg-slate-50">
                        <div className="space-y-3">
-                           <h4 className="text-slate-500 font-black text-[9px] tracking-widest border-b border-[#2d303b] pb-2">Status Control</h4>
+                           <h4 className="text-slate-500 font-black text-[9px] tracking-widest border-b border-slate-200 pb-2">Status Control</h4>
                            <div className="grid gap-2">
                                {showManageCredit.credit_status === 'ACTIVE' ? (
-                                 <button onClick={() => updateCreditStatus(showManageCredit.id, 'SUSPENDED')} className="w-full py-2 bg-orange-600/10 hover:bg-orange-600/20 text-orange-400 border border-orange-500/20 rounded font-black text-[9px] transition-all tracking-widest uppercase italic">Suspend Account</button>
+                                 <button onClick={() => updateCreditStatus(showManageCredit.id, 'SUSPENDED')} className="w-full py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded font-black text-[9px] transition-all tracking-widest uppercase italic">Suspend Account</button>
                                ) : (
-                                 <button onClick={() => updateCreditStatus(showManageCredit.id, 'ACTIVE')} className="w-full py-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 rounded font-black text-[9px] transition-all tracking-widest uppercase italic">Reactivate Account</button>
+                                 <button onClick={() => updateCreditStatus(showManageCredit.id, 'ACTIVE')} className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded font-black text-[9px] transition-all tracking-widest uppercase italic">Reactivate Account</button>
                                )}
-                               <button onClick={() => updateCreditStatus(showManageCredit.id, 'CLOSED')} className="w-full py-2 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded font-black text-[9px] transition-all tracking-widest uppercase italic">Close Account</button>
+                               <button onClick={() => updateCreditStatus(showManageCredit.id, 'CLOSED')} className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-250 rounded font-black text-[9px] transition-all tracking-widest uppercase italic justify-center">Close Account</button>
                            </div>
                        </div>
                        
                        <div className="space-y-3">
-                           <h4 className="text-slate-500 font-black text-[9px] tracking-widest border-b border-[#2d303b] pb-2">Manual Adjustment</h4>
-                           <div className="p-3 bg-[#0f1117] border border-[#2d303b] rounded text-center">
-                               <div className="text-slate-600 text-[8px] font-black uppercase mb-1">Current Limit</div>
-                               <div className="text-xl font-black text-white italic tracking-tighter">{currency.symbol}{showManageCredit.credit_limit}</div>
-                               <button onClick={() => updateCreditLimitManually(showManageCredit.id)} className="mt-3 text-[8px] font-black text-indigo-400 uppercase tracking-widest hover:underline decoration-indigo-800">Change Limit</button>
+                           <h4 className="text-slate-500 font-black text-[9px] tracking-widest border-b border-slate-200 pb-2">Manual Adjustment</h4>
+                           <div className="p-3 bg-white border border-slate-200 rounded text-center">
+                               <div className="text-slate-500 text-[8px] font-black uppercase mb-1">Current Limit</div>
+                               <div className="text-xl font-black text-slate-900 italic tracking-tighter">{currency.symbol}{showManageCredit.credit_limit}</div>
+                               <button onClick={() => updateCreditLimitManually(showManageCredit.id)} className="mt-3 text-[8px] font-black text-indigo-600 uppercase tracking-widest hover:underline hover:text-indigo-800">Change Limit</button>
                            </div>
                        </div>
                    </div>
 
                    {/* Right Panel: Audit Logs */}
-                   <div className="col-span-9 flex flex-col overflow-hidden bg-[#0f1117]/30">
+                   <div className="col-span-9 flex flex-col overflow-hidden bg-slate-50/30">
                        <div className="flex-1 overflow-hidden grid grid-rows-2">
                            {/* Limit history */}
-                           <div className="flex flex-col border-b border-[#2d303b]/50">
-                               <div className="p-2 bg-[#1c1f26] border-b border-[#2d303b] text-[9px] font-black text-slate-500 tracking-widest">Limit Change History</div>
+                           <div className="flex flex-col border-b border-slate-200">
+                               <div className="p-2 bg-slate-50 border-b border-slate-200 text-[9px] font-black text-slate-500 tracking-widest">Limit Change History</div>
                                <div className="flex-1 overflow-auto p-4 space-y-2 custom-scrollbar">
                                    {creditHistory.map((h, i) => (
-                                     <div key={i} className="bg-[#181a20]/80 border border-[#2d303b]/30 p-2 flex justify-between items-center text-[9px] font-black tracking-widest">
+                                     <div key={i} className="bg-white border border-slate-200 p-2 flex justify-between items-center text-[9px] font-black tracking-widest rounded shadow-sm">
                                         <div className="flex flex-col gap-1">
                                             <div className="flex gap-4">
-                                                <span className="text-slate-700 line-through decoration-slate-900">{currency.symbol}{h.old_limit}</span>
-                                                <span className="text-emerald-400 animate-pulse">→ {currency.symbol}{h.new_limit}</span>
+                                                <span className="text-slate-400 line-through decoration-slate-250">{currency.symbol}{h.old_limit}</span>
+                                                <span className="text-emerald-600 animate-pulse">→ {currency.symbol}{h.new_limit}</span>
                                             </div>
-                                            <span className="text-slate-500 italic opacity-50 tracking-tighter">REASON: {h.reason}</span>
+                                            <span className="text-slate-500 italic opacity-85 tracking-tighter">REASON: {h.reason}</span>
                                         </div>
-                                        <span className="text-slate-700 font-bold">{new Date(h.created_at).toISOString().split('T')[0]}</span>
+                                        <span className="text-slate-400 font-bold">{new Date(h.created_at).toISOString().split('T')[0]}</span>
                                      </div>
                                    ))}
-                                   {creditHistory.length === 0 && <div className="py-20 text-center text-slate-800 tracking-[0.5em]">NO HISTORY FOUND</div>}
+                                   {creditHistory.length === 0 && <div className="py-20 text-center text-slate-400 tracking-[0.5em] font-black">NO HISTORY FOUND</div>}
                                </div>
                            </div>
                            {/* Status logs */}
                            <div className="flex flex-col">
-                               <div className="p-2 bg-[#1c1f26] border-b border-[#2d303b] text-[9px] font-black text-slate-500 tracking-widest">Status Change History</div>
+                               <div className="p-2 bg-slate-50 border-b border-slate-200 text-[9px] font-black text-slate-500 tracking-widest">Status Change History</div>
                                <div className="flex-1 overflow-auto p-4 space-y-2 custom-scrollbar">
                                    {statusLogs.map((l, i) => (
-                                     <div key={i} className="bg-[#181a20]/80 border border-[#2d303b]/30 p-2 flex justify-between items-center text-[9px] font-black tracking-widest">
+                                     <div key={i} className="bg-white border border-slate-200 p-2 flex justify-between items-center text-[9px] font-black tracking-widest rounded shadow-sm">
                                         <div className="flex flex-col gap-1">
                                             <div className="flex gap-4 capitalize">
-                                                <span className="text-slate-700">{l.previous_status}</span>
-                                                <span className="text-orange-400">→ {l.new_status}</span>
+                                                <span className="text-slate-400">{l.previous_status}</span>
+                                                <span className="text-orange-600">→ {l.new_status}</span>
                                             </div>
-                                            <span className="text-slate-500 italic opacity-50 tracking-tighter">REASON: {l.reason} <span className="not-italic text-slate-700">| BY: {l.changed_by_user}</span></span>
+                                            <span className="text-slate-500 italic opacity-85 tracking-tighter">REASON: {l.reason} <span className="not-italic text-slate-450">| BY: {l.changed_by_user}</span></span>
                                         </div>
-                                        <span className="text-slate-700 font-bold">{new Date(l.created_at).toISOString().split('T')[0]}</span>
+                                        <span className="text-slate-400 font-bold">{new Date(l.created_at).toISOString().split('T')[0]}</span>
                                      </div>
                                    ))}
-                                   {statusLogs.length === 0 && <div className="py-10 text-center text-slate-800 tracking-[0.5em]">NO HISTORY FOUND</div>}
+                                   {statusLogs.length === 0 && <div className="py-10 text-center text-slate-400 tracking-[0.5em] font-black">NO HISTORY FOUND</div>}
                                </div>
                            </div>
                        </div>
@@ -516,11 +716,11 @@ export default function Customers() {
       )}
 
       {showSettings && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 bg-[#0f1117]/90 backdrop-blur-sm">
-           <div className="w-full max-w-sm bg-[#181a20] border border-[#2d303b] rounded shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
-              <div className="p-3 border-b border-[#2d303b] bg-[#1c1f26] flex items-center justify-between">
-                 <span className="font-black text-white uppercase tracking-widest">Credit Settings</span>
-                 <button onClick={() => setShowSettings(false)} className="text-slate-500 hover:text-white transition"><X size={16}/></button>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 bg-slate-900/40 backdrop-blur-sm">
+           <div className="w-full max-w-sm bg-white border border-slate-200 rounded shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+              <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                 <span className="font-black text-slate-900 uppercase tracking-widest">Credit Settings</span>
+                 <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-900 transition"><X size={16}/></button>
               </div>
               <div className="p-6 space-y-6">
                  <div className="space-y-2">
@@ -529,11 +729,11 @@ export default function Customers() {
                        <input 
                         type="number" step="0.1" 
                         value={multiplier} onChange={e => setMultiplier(e.target.value)} 
-                        className="flex-1 bg-[#2d303b] border border-[#3b404d] text-white px-3 py-2 rounded outline-none focus:ring-1 focus:ring-indigo-500 text-xl font-black text-center italic"
+                        className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 px-3 py-2 rounded outline-none focus:ring-1 focus:ring-indigo-500 text-xl font-black text-center italic"
                        />
-                       <span className="text-slate-700 font-black text-xl">x</span>
+                       <span className="text-slate-400 font-black text-xl">x</span>
                     </div>
-                    <p className="text-[8px] text-slate-600 font-bold leading-relaxed tracking-tighter">Calculates how much credit limit increases when debt is paid (Amount * {multiplier})</p>
+                    <p className="text-[8px] text-slate-500 font-bold leading-relaxed tracking-tighter">Calculates how much credit limit increases when debt is paid (Amount * {multiplier})</p>
                  </div>
                  <button onClick={saveSettings} disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded text-xs tracking-widest uppercase transition-all disabled:opacity-50 shadow-xl shadow-indigo-500/10">Save Settings</button>
               </div>
@@ -543,7 +743,7 @@ export default function Customers() {
 
       {/* Bulk Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-100/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <div className="bg-white border border-slate-200 rounded max-w-sm w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
                 <div className="p-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                     <span className="text-slate-900 font-black tracking-widest text-[10px]">MEMBER_BULK_UPLOAD</span>
@@ -566,7 +766,7 @@ export default function Customers() {
                     </a>
 
                     {importStatus && (
-                      <div className={`text-[8px] font-black italic tracking-widest p-2 border rounded ${importStatus.includes('Error') ? 'bg-red-50 text-red-500 border-red-100' : 'bg-indigo-50 text-indigo-500 border-indigo-100'}`}>
+                      <div className={`text-[10px] font-bold p-3 border rounded whitespace-pre-wrap ${importStatus.includes('Error') ? 'bg-red-50 text-red-600 border-red-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
                         {importStatus}
                       </div>
                     )}
@@ -582,20 +782,58 @@ export default function Customers() {
                             skipEmptyLines: true,
                             complete: async (results) => {
                               try {
-                                const customersToImport = results.data.map((row: any) => ({
-                                  name: row.name || '',
-                                  rfid_card: row.rfid_card || '',
-                                  phone: row.phone || '',
-                                  credit_limit: parseFloat(row.credit_limit) || 0,
-                                  daily_limit: parseFloat(row.daily_limit) || 0,
-                                  monthly_limit: parseFloat(row.monthly_limit) || 0,
-                                  working_place: row.working_place || '',
-                                  emp_id: row.emp_id || '',
-                                  passport_no: row.passport_no || '',
-                                  auto_burn: row.auto_burn === 'true' || row.auto_burn === '1',
-                                  auto_burn_start_date: row.auto_burn_start_date || '',
-                                  auto_burn_stop_date: row.auto_burn_stop_date || ''
-                                }));
+                                const errors: string[] = [];
+                                const customersToImport: any[] = [];
+                                
+                                const existingRfids = new Set(customers.map(c => c.rfid_card).filter(Boolean));
+
+                                results.data.forEach((row: any, index: number) => {
+                                  const rowNum = index + 2; // header is row 1
+                                  
+                                  if (!row.name || row.name.toString().trim() === '') {
+                                    errors.push(`Row ${rowNum}: 'name' is required`);
+                                  }
+                                  
+                                  if (row.rfid_card && existingRfids.has(row.rfid_card)) {
+                                    errors.push(`Row ${rowNum}: rfid_card '${row.rfid_card}' already exists`);
+                                  }
+
+                                  const creditLimit = parseFloat(row.credit_limit);
+                                  if (row.credit_limit && isNaN(creditLimit)) errors.push(`Row ${rowNum}: 'credit_limit' formatting error`);
+                                  
+                                  const dailyLimit = parseFloat(row.daily_limit);
+                                  if (row.daily_limit && isNaN(dailyLimit)) errors.push(`Row ${rowNum}: 'daily_limit' formatting error`);
+
+                                  const monthlyLimit = parseFloat(row.monthly_limit);
+                                  if (row.monthly_limit && isNaN(monthlyLimit)) errors.push(`Row ${rowNum}: 'monthly_limit' formatting error`);
+                                  
+                                  const autoBurnStr = String(row.auto_burn).toLowerCase();
+                                  if (row.auto_burn && !['true', 'false', '1', '0', ''].includes(autoBurnStr)) {
+                                    errors.push(`Row ${rowNum}: 'auto_burn' must be TRUE/FALSE`);
+                                  }
+
+                                  customersToImport.push({
+                                    name: row.name || '',
+                                    rfid_card: row.rfid_card || '',
+                                    phone: row.phone || '',
+                                    credit_limit: isNaN(creditLimit) ? 0 : creditLimit,
+                                    daily_limit: isNaN(dailyLimit) ? 0 : dailyLimit,
+                                    monthly_limit: isNaN(monthlyLimit) ? 0 : monthlyLimit,
+                                    working_place: row.working_place || '',
+                                    emp_id: row.emp_id || '',
+                                    passport_no: row.passport_no || '',
+                                    auto_burn: autoBurnStr === 'true' || autoBurnStr === '1',
+                                    auto_burn_start_date: row.auto_burn_start_date || '',
+                                    auto_burn_stop_date: row.auto_burn_stop_date || '',
+                                    member_type: 'DELIVERY'
+                                  });
+                                });
+
+                                if (errors.length > 0) {
+                                  setImportStatus(`Error: Validation failed\n${errors.join('\n')}`);
+                                  setImportLoading(false);
+                                  return;
+                                }
 
                                 const res = await fetch('/api/customers/bulk', {
                                   method: 'POST',
@@ -616,7 +854,7 @@ export default function Customers() {
                                   setImportStatus(`Error: ${data.message}`);
                                 }
                               } catch (err: any) {
-                                setImportStatus(`Import failed: ${err.message}`);
+                                setImportStatus(`Error: Import failed - ${err.message}`);
                               } finally {
                                 setImportLoading(false);
                               }
