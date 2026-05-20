@@ -114,6 +114,41 @@ app.post('/api/auth/login', async (req, res) => {
     }
   });
 
+  // CONFIGURATION STATUS CHECK
+  app.get('/api/config-status', async (req, res) => {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const isConfigured = !!(supabaseUrl && supabaseKey);
+    let isConnected = false;
+    let errorDetail: string | null = null;
+
+    if (isConfigured) {
+      try {
+        const { error } = await supabase.from('users').select('*', { count: 'exact', head: true });
+        if (error) {
+          errorDetail = typeof error.message === 'string' && error.message.includes('<!DOCTYPE html>')
+            ? 'Received HTML response (Likely invalid SUPABASE_URL)'
+            : error.message;
+        } else {
+          isConnected = true;
+        }
+      } catch (err: any) {
+        errorDetail = err?.message || String(err);
+      }
+    }
+
+    res.json({
+      success: true,
+      isConfigured,
+      isConnected,
+      errorDetail,
+      env: {
+        SUPABASE_URL: supabaseUrl ? 'SET' : 'MISSING',
+        SUPABASE_SERVICE_ROLE_KEY: supabaseKey ? 'SET' : 'MISSING'
+      }
+    });
+  });
+
   // USER MANAGEMENT (Admin Only)
   app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {

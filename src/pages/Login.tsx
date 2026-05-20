@@ -1,16 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Lock, LogIn, Store } from 'lucide-react';
+import { Lock, LogIn, Store, AlertTriangle, CheckCircle2, Server, Terminal, HelpCircle, Layers } from 'lucide-react';
+
+interface ConfigStatus {
+  isConfigured: boolean;
+  isConnected: boolean;
+  errorDetail: string | null;
+  env: {
+    SUPABASE_URL: string;
+    SUPABASE_SERVICE_ROLE_KEY: string;
+  };
+}
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
   
   const navigate = useNavigate();
   const { login } = useAuthStore();
+
+  useEffect(() => {
+    fetch('/api/config-status')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setConfigStatus(data);
+        }
+      })
+      .catch(err => console.error('Failed to retrieve server configuration status:', err));
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,8 +66,9 @@ export default function Login() {
       } else {
         setError(data.message || 'Login failed');
       }
-    } catch (err) {
-      setError('An error occurred during login');
+    } catch (err: any) {
+      console.error('Login request failed details:', err);
+      setError(`An error occurred during login: ${err?.message || err || 'Unknown'}`);
     } finally {
       setLoading(false);
     }
@@ -67,7 +91,78 @@ export default function Login() {
         </div>
       </div>
 
-      <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md space-y-4">
+        {/* Supabase Status Banner */}
+        {configStatus && (
+          <div className={`p-4 border rounded-lg flex flex-col gap-2 transition-all ${
+            configStatus.isConnected 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-amber-50 border-amber-200 text-amber-800'
+          }`}>
+            <div className="flex items-center justify-between font-bold tracking-wider">
+              <div className="flex items-center gap-2">
+                <Server className="w-4 h-4" />
+                <span>DATABASE STATE: {configStatus.isConnected ? 'ONLINE_READY' : 'SETUP_REQUIRED'}</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowHelp(!showHelp)}
+                className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-100 border rounded cursor-pointer transition-all duration-200 text-[8px]"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-slate-500" /> {showHelp ? 'HIDE_GUIDE' : 'CONFIG_HELP'}
+              </button>
+            </div>
+
+            {!configStatus.isConfigured && (
+              <p className="text-[8px] leading-relaxed select-text font-medium self-start">
+                SUPABASE CRITICAL KEYS ARE UNCONFIGURED. API AUTHENTICATION WILL NOT BE COMPLETED UNTIL VARIABLES ARE ADDED.
+              </p>
+            )}
+
+            {configStatus.isConfigured && !configStatus.isConnected && (
+              <div className="text-[8px] leading-relaxed font-black block w-full whitespace-pre-wrap select-text">
+                KEYS LOADED BUT COUPLING FAILED:<br/>
+                <span className="text-red-600 font-bold">{configStatus.errorDetail}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Dynamic Instruction Walkthrough Panel */}
+        {((configStatus && (!configStatus.isConfigured || !configStatus.isConnected)) || showHelp) && (
+          <div className="p-5 bg-white border border-slate-200 rounded-lg shadow-xl space-y-4 text-[8px] font-bold tracking-wider text-slate-700">
+            <div className="flex items-center gap-2 border-b pb-2 text-indigo-600">
+              <Layers className="w-4 h-4" />
+              <span>SUPABASE COUPLING MANUAL - 2 ENVIRONMENTS</span>
+            </div>
+
+            <div className="space-y-4 select-text">
+              <div className="space-y-1">
+                <div className="text-slate-900 border-l-2 border-indigo-500 pl-2">ENVIRONMENT 1: GOOGLE AI STUDIO (DEVELOPMENT REPLAY)</div>
+                <p className="font-normal text-slate-500 leading-relaxed normal-case">
+                  Open the Settings panel (gear icon) in the bottom-left corner of the AI Studio workspace, choose <strong className="font-bold text-slate-800">"Secrets"</strong>, and insert the keys:
+                </p>
+                <div className="bg-slate-50 p-2.5 rounded border border-slate-100 font-mono text-[8px] text-slate-600 lowercase">
+                  <span className="uppercase font-bold text-slate-800">SUPABASE_URL</span>=https://your-project.supabase.co<br />
+                  <span className="uppercase font-bold text-slate-800">SUPABASE_SERVICE_ROLE_KEY</span>=eyJhbGciOi...
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-slate-900 border-l-2 border-indigo-500 pl-2">ENVIRONMENT 2: VERCEL (PRODUCTION ENVIRONMENT)</div>
+                <p className="font-normal text-slate-500 leading-relaxed normal-case">
+                  Go to your project dashboard on Vercel, navigate to <strong className="font-bold text-slate-800">Settings &gt; Environment Variables</strong>, and input these variables. Vercel automatically matches and injects them to Serverless functions on execution.
+                </p>
+              </div>
+
+              <div className="space-y-1 bg-indigo-50/50 p-3 rounded border border-indigo-100/60 leading-relaxed text-indigo-900/80 font-medium normal-case">
+                <span className="font-bold block uppercase tracking-widest text-indigo-600 mb-1">Database Schema Setup:</span>
+                Make sure you have executed the schema commands in <abbr className="font-bold tracking-wide text-indigo-900" title="supabase-schema.sql">supabase-schema.sql</abbr> inside your Supabase SQL Editor. This initializes the <strong className="font-bold text-slate-800">users</strong> table and seeding triggers.
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white py-10 px-8 border border-slate-200 shadow-2xl rounded-lg">
           <form className="space-y-6" onSubmit={handleLogin}>
             {error && (
