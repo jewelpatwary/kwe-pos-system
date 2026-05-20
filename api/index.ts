@@ -1,7 +1,7 @@
 export default async function handler(req: any, res: any) {
   try {
     // Dynamically import the Express server to catch any import-time or initialization errors
-    const serverModule = await import('../server');
+    const serverModule = await import('../server.js');
     const app = serverModule.default || serverModule.app;
     
     if (!app) {
