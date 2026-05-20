@@ -26,7 +26,14 @@ export default function Login() {
 
   useEffect(() => {
     fetch('/api/config-status')
-      .then(res => res.json())
+      .then(async res => {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return res.json();
+        }
+        const text = await res.text();
+        throw new Error(`Non-JSON config response (${res.status}): ${text.substring(0, 100)}`);
+      })
       .then(data => {
         if (data.success) {
           setConfigStatus(data);
@@ -54,7 +61,14 @@ export default function Login() {
         body: JSON.stringify({ username, password }),
       });
       
-      const data = await res.json();
+      let data: any;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        throw new Error(`Server returned non-JSON response (Status ${res.status}): ${rawText.substring(0, 250)}`);
+      }
       
       if (data.success) {
         login(data.token, data.user);
