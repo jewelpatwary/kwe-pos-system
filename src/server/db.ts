@@ -1,4 +1,4 @@
-import { getSupabase } from '../lib/supabaseClient.js';
+import { getSupabase } from '../lib/supabaseClient';
 import bcrypt from 'bcryptjs';
 
 // Proxy supabase to implement lazy initialization

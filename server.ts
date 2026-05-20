@@ -4,8 +4,8 @@ import path from 'path';
 import bwipjs from 'bwip-js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { db, initDB, seedProducts } from './src/server/db.js';
-import { getSupabase } from './src/lib/supabaseClient.js';
+import { db, initDB, seedProducts } from './src/server/db';
+import { getSupabase } from './src/lib/supabaseClient';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_pos_key_2026';
 
