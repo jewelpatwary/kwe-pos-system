@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "npx vite build && npx tsc -p tsconfig.server.json",
-    "preview": "npx vite preview",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "start": "node dist/server.js"
   },
@@ -16,7 +17,6 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.9.0",
     "bwip-js": "^4.10.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
@@ -40,7 +40,6 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/bwip-js": "^3.2.3",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
@@ -50,6 +49,7 @@
     "autoprefixer": "^10.4.21",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
-    "typescript": "~5.8.2"
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
 }

@@ -4,8 +4,8 @@ import path from 'path';
 import bwipjs from 'bwip-js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { db, initDB, seedProducts } from './src/server/db.js';
-import { getSupabase } from './src/lib/supabaseClient.js';
+import { db, initDB, seedProducts } from './src/server/db';
+import { getSupabase } from './src/lib/supabaseClient';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_pos_key_2026';
 
@@ -53,9 +53,13 @@ app.use(express.json());
 
 // Initialize Database in the background synchronously to avoid blocking module import in serverless environments
 initDB();
-seedProducts().catch((err: any) => {
-  console.error("Database seeding failed in the background:", err);
-});
+if (process.env.VERCEL !== '1' && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  seedProducts().catch((err: any) => {
+    console.error("Database seeding failed in the background:", err);
+  });
+} else {
+  console.log("Skipping background database seeding (running on Vercel or missing credentials).");
+}
 
 // --- API ROUTES ---
 
