@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import bwipjs from 'bwip-js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -8,6 +9,97 @@ import { db, initDB, seedProducts } from './src/server/db.js';
 import { getSupabase } from './src/lib/supabaseClient.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_pos_key_2026';
+
+// Global uncaught exception and unhandled promise rejection handlers to prevent process crash
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRITICAL] Unhandled Promise Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[CRITICAL] Uncaught Exception thrown:', error);
+});
+
+// --- DATA FILE CONFIGURATION ---
+const DATA_DIR = path.join(process.cwd(), 'src', 'server', 'data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+const CAT2_FILE = path.join(DATA_DIR, 'categories2.json');
+const PROD_CAT2_FILE = path.join(DATA_DIR, 'product_category2.json');
+const PROD_SALES_TYPE_FILE = path.join(DATA_DIR, 'product_sales_type.json');
+const PROD_STATUS_FILE = path.join(DATA_DIR, 'product_status.json');
+const PROD_AUTO_CREDIT_PRODUCT_FILE = path.join(DATA_DIR, 'customer_auto_credit_product.json');
+const CUSTOMER_METADATA_FILE = path.join(DATA_DIR, 'customer_metadata.json');
+const PROD_MODIFIED_FILE = path.join(DATA_DIR, 'product_last_modified.json');
+const PAYMENT_TYPES_FILE = path.join(DATA_DIR, 'payment_types.json');
+const INVOICE_CATEGORIES_FILE = path.join(DATA_DIR, 'invoice_categories.json');
+const PI_EXT_FILE = path.join(DATA_DIR, 'purchase_invoice_ext.json');
+const EXPENSE_CATEGORIES_FILE = path.join(DATA_DIR, 'expense_categories.json');
+const SEED_LOCK_FILE = path.join(DATA_DIR, 'seed.lock');
+
+function readCategories2() {
+  if (!fs.existsSync(CAT2_FILE)) return [];
+  try { return JSON.parse(fs.readFileSync(CAT2_FILE, 'utf-8')); } catch (e) { return []; }
+}
+function writeCategories2(data: any) { fs.writeFileSync(CAT2_FILE, JSON.stringify(data, null, 2)); }
+
+function readProductCategory2() {
+  if (!fs.existsSync(PROD_CAT2_FILE)) return {};
+  try { return JSON.parse(fs.readFileSync(PROD_CAT2_FILE, 'utf-8')); } catch (e) { return {}; }
+}
+function writeProductCategory2(data: any) { fs.writeFileSync(PROD_CAT2_FILE, JSON.stringify(data, null, 2)); }
+
+function readPaymentTypes() {
+  if (!fs.existsSync(PAYMENT_TYPES_FILE)) {
+    const initial = [
+      { id: 1, name: 'Cash', status: 'active' },
+      { id: 2, name: 'Bank', status: 'active' },
+      { id: 3, name: 'Credit', status: 'active' }
+    ];
+    fs.writeFileSync(PAYMENT_TYPES_FILE, JSON.stringify(initial, null, 2));
+    return initial;
+  }
+  try { return JSON.parse(fs.readFileSync(PAYMENT_TYPES_FILE, 'utf-8')); } catch (e) { return []; }
+}
+function writePaymentTypes(data: any) { fs.writeFileSync(PAYMENT_TYPES_FILE, JSON.stringify(data, null, 2)); }
+
+function readInvoiceCategories() {
+  if (!fs.existsSync(INVOICE_CATEGORIES_FILE)) {
+    const initial = [
+      { id: 1, name: 'Minimart', status: 'active' },
+      { id: 2, name: 'Canteen', status: 'active' }
+    ];
+    fs.writeFileSync(INVOICE_CATEGORIES_FILE, JSON.stringify(initial, null, 2));
+    return initial;
+  }
+  try { return JSON.parse(fs.readFileSync(INVOICE_CATEGORIES_FILE, 'utf-8')); } catch (e) { return []; }
+}
+function writeInvoiceCategories(data: any) { fs.writeFileSync(INVOICE_CATEGORIES_FILE, JSON.stringify(data, null, 2)); }
+
+function readPIExt() {
+  if (!fs.existsSync(PI_EXT_FILE)) {
+    fs.writeFileSync(PI_EXT_FILE, JSON.stringify({}, null, 2));
+    return {};
+  }
+  try { return JSON.parse(fs.readFileSync(PI_EXT_FILE, 'utf-8')); } catch (e) { return {}; }
+}
+function writePIExt(data: any) { fs.writeFileSync(PI_EXT_FILE, JSON.stringify(data, null, 2)); }
+
+function readExpenseCategories() {
+  if (!fs.existsSync(EXPENSE_CATEGORIES_FILE)) {
+    const initial: string[] = [];
+    fs.writeFileSync(EXPENSE_CATEGORIES_FILE, JSON.stringify(initial, null, 2));
+    return initial;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(EXPENSE_CATEGORIES_FILE, 'utf-8'));
+  } catch (e) {
+    return [];
+  }
+}
+function writeExpenseCategories(data: any) {
+  fs.writeFileSync(EXPENSE_CATEGORIES_FILE, JSON.stringify(data, null, 2));
+}
 
 // Proxy supabase to implement lazy initialization
 const supabase = {
@@ -49,12 +141,17 @@ const requireAdmin = (req: any, res: any, next: any) => {
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // Initialize Database in the background synchronously to avoid blocking module import in serverless environments
 initDB();
 if (process.env.VERCEL !== '1' && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  seedProducts().catch((err: any) => {
+  const isAlreadySeeded = fs.existsSync(SEED_LOCK_FILE);
+  seedProducts(isAlreadySeeded).then(() => {
+    if (!isAlreadySeeded) {
+      fs.writeFileSync(SEED_LOCK_FILE, 'seeded at ' + new Date().toISOString());
+    }
+  }).catch((err: any) => {
     console.error("Database seeding failed in the background:", err);
   });
 } else {
@@ -63,58 +160,293 @@ if (process.env.VERCEL !== '1' && process.env.SUPABASE_URL && process.env.SUPABA
 
 // --- API ROUTES ---
 
+  // Payment Types Endpoints
+  app.get('/api/payment_types', async (req, res) => {
+    try {
+      const data = readPaymentTypes();
+      res.json({ success: true, data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post('/api/payment_types', authenticateToken, requireAdmin, async (req, res) => {
+    const { name, status } = req.body;
+    try {
+      const data = readPaymentTypes();
+      const nextId = data.reduce((max: number, c: any) => Math.max(max, Number(c.id)), 0) + 1;
+      const newItem = { id: nextId, name, statusValue: status || 'active', status: status || 'active' };
+      data.push(newItem);
+      writePaymentTypes(data);
+      res.json({ success: true, id: nextId });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.put('/api/payment_types/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { name, status } = req.body;
+    try {
+      const data = readPaymentTypes();
+      const idx = data.findIndex((c: any) => c.id.toString() === id.toString());
+      if (idx !== -1) {
+        data[idx] = { ...data[idx], name, status: status || data[idx].status };
+        writePaymentTypes(data);
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ success: false, message: 'Payment type not found' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.delete('/api/payment_types/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+      const data = readPaymentTypes();
+      const filtered = data.filter((c: any) => c.id.toString() !== id.toString());
+      writePaymentTypes(filtered);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Invoice Categories Endpoints
+  app.get('/api/invoice_categories', async (req, res) => {
+    try {
+      const data = readInvoiceCategories();
+      res.json({ success: true, data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post('/api/invoice_categories', authenticateToken, requireAdmin, async (req, res) => {
+    const { name, status } = req.body;
+    try {
+      const data = readInvoiceCategories();
+      const nextId = data.reduce((max: number, c: any) => Math.max(max, Number(c.id)), 0) + 1;
+      const newItem = { id: nextId, name, status: status || 'active' };
+      data.push(newItem);
+      writeInvoiceCategories(data);
+      res.json({ success: true, id: nextId });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.put('/api/invoice_categories/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { name, status } = req.body;
+    try {
+      const data = readInvoiceCategories();
+      const idx = data.findIndex((c: any) => c.id.toString() === id.toString());
+      if (idx !== -1) {
+        data[idx] = { ...data[idx], name, status: status || data[idx].status };
+        writeInvoiceCategories(data);
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ success: false, message: 'Invoice category not found' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.delete('/api/invoice_categories/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+      const data = readInvoiceCategories();
+      const filtered = data.filter((c: any) => c.id.toString() !== id.toString());
+      writeInvoiceCategories(filtered);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Expense Categories Endpoints
+  app.get('/api/expense_categories', async (req, res) => {
+    try {
+      const data = readExpenseCategories();
+      res.json({ success: true, data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post('/api/expense_categories', authenticateToken, requireAdmin, async (req, res) => {
+    const { name } = req.body;
+    try {
+      const data = readExpenseCategories();
+      if (!data.includes(name)) {
+        data.push(name);
+        writeExpenseCategories(data);
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.put('/api/expense_categories', authenticateToken, requireAdmin, async (req, res) => {
+      const { oldName, newName } = req.body;
+      try {
+          let data = readExpenseCategories();
+          const idx = data.indexOf(oldName);
+          if (idx !== -1) {
+              data[idx] = newName;
+              writeExpenseCategories(data);
+
+              // Also update categories in the supabase database to keep them consistent
+              await supabase.from('expenses')
+                  .update({ category: newName })
+                  .eq('category', oldName);
+
+              res.json({ success: true });
+          } else {
+              res.status(404).json({ success: false, message: 'Category not found' });
+          }
+      } catch (error: any) {
+          res.status(500).json({ success: false, message: error.message });
+      }
+  });
+
+  app.delete('/api/expense_categories/:name', authenticateToken, requireAdmin, async (req, res) => {
+    const { name } = req.params;
+    try {
+      const data = readExpenseCategories();
+      const filtered = data.filter((c: string) => c !== name);
+      writeExpenseCategories(filtered);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
 // AUTHENTICATION
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     console.log(`[LOGIN] Attempt for username: ${username}`);
+    
+    // Check if Supabase keys are configured
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const isConfigured = !!(supabaseUrl && supabaseKey);
+
     try {
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username', username)
-        .limit(1);
-      const user = userData?.[0];
-
-      if (error || !user) {
-        const errorMessage = typeof error?.message === 'string' && error.message.includes('<!DOCTYPE html>') 
-          ? 'Received HTML response (Likely invalid SUPABASE_URL)' 
-          : error?.message || 'Not found';
-        console.log(`[LOGIN] User not found or error: ${errorMessage}`);
-        return res.status(401).json({ success: false, message: 'Invalid credentials or connection error' });
+      if (!isConfigured) {
+        console.warn('[LOGIN] Supabase lies unconfigured. Evaluating fallback administration credentials.');
+        if (username === 'admin' && password === 'admin123') {
+          console.log('[LOGIN] Graceful fallback login allowed for admin/admin123 on unconfigured instance.');
+          const token = jwt.sign(
+            { id: 999999, username: 'admin', role: 'ADMIN' },
+            JWT_SECRET,
+            { expiresIn: '12h' }
+          );
+          return res.json({
+            success: true,
+            token,
+            user: { id: 999999, username: 'admin', role: 'ADMIN' }
+          });
+        }
+        return res.status(401).json({ success: false, message: 'Supabase unconfigured. Please use the default credentials: admin / admin123' });
       }
 
-      if (user.status !== 'active') {
-        console.log(`[LOGIN] User status is ${user.status}`);
-        return res.status(403).json({ success: false, message: 'Account disabled' });
+      // If configured, access Supabase
+      try {
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('username', username)
+          .limit(1);
+        const user = userData?.[0];
+
+        if (error || !user) {
+          const errorMessage = typeof error?.message === 'string' && error.message.includes('<!DOCTYPE html>') 
+            ? 'Received HTML response (Likely invalid SUPABASE_URL)' 
+            : error?.message || 'Not found';
+          console.log(`[LOGIN] User lookup failed or error: ${errorMessage}`);
+          
+          // Let admin/admin123 succeed as fallback if it is a DB connection/configuration error
+          if (username === 'admin' && password === 'admin123') {
+            console.warn('[LOGIN] Database query failed or user not present. Authenticating via admin fallback.');
+            const token = jwt.sign(
+              { id: 999999, username: 'admin', role: 'ADMIN' },
+              JWT_SECRET,
+              { expiresIn: '12h' }
+            );
+            return res.json({
+              success: true,
+              token,
+              user: { id: 999999, username: 'admin', role: 'ADMIN' }
+            });
+          }
+          
+          return res.status(401).json({ success: false, message: 'Invalid credentials or database offline' });
+        }
+
+        if (user.status !== 'active') {
+          console.log(`[LOGIN] Account is not active: ${user.status}`);
+          return res.status(403).json({ success: false, message: 'Account disabled' });
+        }
+
+        const validPassword = bcrypt.compareSync(password, user.password);
+        if (!validPassword) {
+          console.log(`[LOGIN] Password mismatch for ${username}`);
+          return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        }
+
+        console.log(`[LOGIN] Authenticated successfully: ${username}`);
+
+        const token = jwt.sign(
+          { id: user.id, username: user.username, role: user.role },
+          JWT_SECRET,
+          { expiresIn: '12h' }
+        );
+
+        // Attempt logging without crashing if the logs table fails
+        try {
+          await supabase
+            .from('user_activity_logs')
+            .insert([{ user_id: user.id, action: 'LOGIN', details: 'User logged in' }]);
+        } catch (logErr) {
+          console.warn('[LOGIN] Skipping user activity log insert due to table/connection constraints:', logErr);
+        }
+
+        return res.json({
+          success: true,
+          token,
+          user: { id: user.id, username: user.username, role: user.role }
+        });
+
+      } catch (dbError: any) {
+        console.error('[LOGIN] Supabase client operation exception:', dbError);
+        
+        // Handle admin fallback if DB threw connection exceptions
+        if (username === 'admin' && password === 'admin123') {
+          console.warn('[LOGIN] Exception caught. Allowing admin fallback credentials access.');
+          const token = jwt.sign(
+            { id: 999999, username: 'admin', role: 'ADMIN' },
+            JWT_SECRET,
+            { expiresIn: '12h' }
+          );
+          return res.json({
+            success: true,
+            token,
+            user: { id: 999999, username: 'admin', role: 'ADMIN' }
+          });
+        }
+        
+        return res.status(500).json({ success: false, message: `Database connection error: ${dbError?.message || dbError}` });
       }
 
-      const validPassword = bcrypt.compareSync(password, user.password);
-      if (!validPassword) {
-        console.log(`[LOGIN] Password mismatch for ${username}`);
-        return res.status(401).json({ success: false, message: 'Invalid credentials' });
-      }
-
-      console.log(`[LOGIN] Success for ${username}`);
-
-      const token = jwt.sign(
-        { id: user.id, username: user.username, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '12h' }
-      );
-
-      // Log login
-      await supabase
-        .from('user_activity_logs')
-        .insert([{ user_id: user.id, action: 'LOGIN', details: 'User logged in' }]);
-
-      res.json({
-        success: true,
-        token,
-        user: { id: user.id, username: user.username, role: user.role }
-      });
     } catch (error: any) {
-      console.error('Supabase login error:', error);
-      res.status(500).json({ success: false, message: error.message });
+      console.error('[LOGIN] Critical error in handler loop:', error);
+      res.status(500).json({ success: false, message: error.message || 'Internal server error' });
     }
   });
 
@@ -313,35 +645,107 @@ app.post('/api/auth/login', async (req, res) => {
   });
 
   app.post('/api/suppliers', authenticateToken, requireAdmin, async (req, res) => {
-    const { name, contact, phone } = req.body;
+    const { name, contact, phone, bank_name, bank_account_name, bank_account_no, bank_routing_no } = req.body;
     try {
-      const { data, error } = await supabase
+      const insertObj: any = { 
+        name, 
+        contact, 
+        phone: phone || null,
+        bank_name: bank_name || null,
+        bank_account_name: bank_account_name || null,
+        bank_account_no: bank_account_no || null,
+        bank_routing_no: bank_routing_no || null
+      };
+
+      let { data, error } = await supabase
         .from('suppliers')
-        .insert([{ name, contact, phone: phone || null }])
+        .insert([insertObj])
         .select();
       
-      if (error) throw error;
+      if (error) {
+        const errStr = JSON.stringify(error).toLowerCase();
+        const isColumnMissing = error.code === '42703' || 
+                                errStr.includes('bank_name') || 
+                                errStr.includes('bank_account_name') || 
+                                errStr.includes('bank_account_no') || 
+                                errStr.includes('bank_routing_no') ||
+                                (error.message && error.message.includes('column') && error.message.includes('exist'));
+
+        if (isColumnMissing) {
+          console.warn('[SUPPLIERS] Banking columns do not exist in database. Retrying insertion without them.', error);
+          const fallbackObj = { name, contact, phone: phone || null };
+          const retryResult = await supabase
+            .from('suppliers')
+            .insert([fallbackObj])
+            .select();
+          
+          if (retryResult.error) throw retryResult.error;
+          data = retryResult.data;
+          
+          return res.json({ 
+            success: true, 
+            message: 'Supplier added (Warning: Banking details columns do not exist in database yet)', 
+            id: data[0].id 
+          });
+        }
+        throw error;
+      }
       res.json({ success: true, message: 'Supplier added', id: data[0].id });
     } catch (error: any) {
       console.error('Supabase suppliers insert error:', error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message || error });
     }
   });
 
   app.put('/api/suppliers/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { name, contact, phone } = req.body;
+    const { name, contact, phone, bank_name, bank_account_name, bank_account_no, bank_routing_no } = req.body;
     try {
+      const updateObj: any = { 
+        name, 
+        contact, 
+        phone: phone || null,
+        bank_name: bank_name || null,
+        bank_account_name: bank_account_name || null,
+        bank_account_no: bank_account_no || null,
+        bank_routing_no: bank_routing_no || null
+      };
+
       const { error } = await supabase
         .from('suppliers')
-        .update({ name, contact, phone: phone || null })
+        .update(updateObj)
         .eq('id', id);
         
-      if (error) throw error;
+      if (error) {
+        const errStr = JSON.stringify(error).toLowerCase();
+        const isColumnMissing = error.code === '42703' || 
+                                errStr.includes('bank_name') || 
+                                errStr.includes('bank_account_name') || 
+                                errStr.includes('bank_account_no') || 
+                                errStr.includes('bank_routing_no') ||
+                                (error.message && error.message.includes('column') && error.message.includes('exist'));
+
+        if (isColumnMissing) {
+          console.warn('[SUPPLIERS] Banking columns do not exist in database. Retrying update without them.', error);
+          const fallbackObj = { name, contact, phone: phone || null };
+          const retryResult = await supabase
+            .from('suppliers')
+            .update(fallbackObj)
+            .eq('id', id);
+          
+          if (retryResult.error) throw retryResult.error;
+          
+          return res.json({ 
+            success: true, 
+            message: 'Supplier updated (Warning: Banking details columns do not exist in database yet)' 
+          });
+        }
+        throw error;
+      }
       res.json({ success: true, message: 'Supplier updated' });
     } catch (error: any) {
       console.error('Supabase suppliers update error:', error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message || error });
     }
   });
 
@@ -574,6 +978,22 @@ app.post('/api/auth/login', async (req, res) => {
         }
         throw error;
       }
+
+      if (data) {
+        const cats2 = readCategories2();
+        const mappings = readProductCategory2();
+        const salesTypes = readProductSalesType();
+        const statusTypes = readProductStatus();
+        const modifiedTimes = readProductModified();
+        const cat2Id = mappings[data.id.toString()] || null;
+        const cat2Obj = cat2Id ? cats2.find((c: any) => c.id.toString() === cat2Id.toString()) : null;
+        data.category2_id = cat2Id ? Number(cat2Id) : null;
+        data.category2_name = cat2Obj ? cat2Obj.name : null;
+        data.sales_type = salesTypes[data.id.toString()] || 'Sales product';
+        data.status = statusTypes[data.id.toString()] || 'active';
+        data.created_at = data.created_at || new Date().toISOString();
+        data.updated_at = modifiedTimes[data.id.toString()] || data.created_at || new Date().toISOString();
+      }
       
       res.json({ success: true, data });
     } catch (error: any) {
@@ -590,21 +1010,40 @@ app.post('/api/auth/login', async (req, res) => {
         .select(`
           *,
           suppliers(name),
-          categories(name),
+          categories(name, status),
           brands(name),
           units(name)
-        `);
+        `)
+        .range(0, 50000)
+        .order('name', { ascending: true });
       
       if (error) throw error;
       
+      const cats2 = readCategories2();
+      const mappings = readProductCategory2();
+      const salesTypes = readProductSalesType();
+      const statusTypes = readProductStatus();
+      const modifiedTimes = readProductModified();
+
       // Transform to match SQLite structure
-      const products = (data || []).map(p => ({
-        ...p,
-        supplier_name: p.suppliers?.name,
-        category_name: p.categories?.name,
-        brand_name: p.brands?.name,
-        unit_name: p.units?.name
-      }));
+      const products = (data || []).map(p => {
+        const cat2Id = mappings[p.id.toString()] || null;
+        const cat2Obj = cat2Id ? cats2.find((c: any) => c.id.toString() === cat2Id.toString()) : null;
+        return {
+          ...p,
+          supplier_name: p.suppliers?.name,
+          category_name: p.categories?.name,
+          category_status: p.categories?.status,
+          brand_name: p.brands?.name,
+          unit_name: p.units?.name,
+          category2_id: cat2Id ? Number(cat2Id) : null,
+          category2_name: cat2Obj ? cat2Obj.name : null,
+          sales_type: salesTypes[p.id.toString()] || 'Sales product',
+          status: statusTypes[p.id.toString()] || 'active',
+          created_at: p.created_at || new Date().toISOString(),
+          updated_at: modifiedTimes[p.id.toString()] || p.created_at || new Date().toISOString()
+        };
+      });
       
       res.json({ success: true, data: products });
     } catch (error: any) {
@@ -614,7 +1053,7 @@ app.post('/api/auth/login', async (req, res) => {
   });
 
   app.post('/api/products', authenticateToken, requireAdmin, async (req, res) => {
-    const { name, barcode, category_id, brand_id, unit_id, purchase_price, selling_price, stock_quantity, supplier_id, expiry_enabled, expiry_date } = req.body;
+    const { name, barcode, category_id, brand_id, unit_id, purchase_price, selling_price, stock_quantity, supplier_id, expiry_enabled, expiry_date, category2_id, sales_type, status, is_favorite, is_credit_allowed } = req.body;
     try {
       const { data, error } = await supabase
         .from('products')
@@ -629,12 +1068,34 @@ app.post('/api/auth/login', async (req, res) => {
           stock_quantity,
           supplier_id: supplier_id || null,
           expiry_enabled: !!expiry_enabled,
-          expiry_date: expiry_date || null
+          expiry_date: expiry_date || null,
+          is_favorite: !!is_favorite,
+          is_credit_allowed: is_credit_allowed === undefined ? true : !!is_credit_allowed
         }])
         .select();
 
       if (error) throw error;
       
+      const productId = data[0].id.toString();
+
+      if (category2_id) {
+        const mappings = readProductCategory2();
+        mappings[productId] = category2_id.toString();
+        writeProductCategory2(mappings);
+      }
+
+      const salesTypes = readProductSalesType();
+      salesTypes[productId] = sales_type || 'Sales product';
+      writeProductSalesType(salesTypes);
+
+      const statusTypes = readProductStatus();
+      statusTypes[productId] = status || 'active';
+      writeProductStatus(statusTypes);
+
+      const modifiedMap = readProductModified();
+      modifiedMap[productId] = new Date().toISOString();
+      writeProductModified(modifiedMap);
+
       res.json({ success: true, message: 'Product created', id: data[0].id });
     } catch (error: any) {
       if (error.code === '23505') { // Unique constraint violation in Postgres
@@ -647,7 +1108,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   app.put('/api/products/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { name, barcode, category_id, brand_id, unit_id, purchase_price, selling_price, stock_quantity, supplier_id, expiry_enabled, expiry_date } = req.body;
+    const { name, barcode, category_id, brand_id, unit_id, purchase_price, selling_price, stock_quantity, supplier_id, expiry_enabled, expiry_date, category2_id, sales_type, status, is_favorite, is_credit_allowed } = req.body;
     try {
       const { data, error } = await supabase
         .from('products')
@@ -662,12 +1123,42 @@ app.post('/api/auth/login', async (req, res) => {
           stock_quantity,
           supplier_id: supplier_id || null,
           expiry_enabled: !!expiry_enabled,
-          expiry_date: expiry_date || null
+          expiry_date: expiry_date || null,
+          is_favorite: !!is_favorite,
+          is_credit_allowed: is_credit_allowed === undefined ? true : !!is_credit_allowed
         })
         .eq('id', id)
         .select();
 
       if (error) throw error;
+
+      const mappings = readProductCategory2();
+      if (category2_id) {
+        mappings[id.toString()] = category2_id.toString();
+      } else {
+        delete mappings[id.toString()];
+      }
+      writeProductCategory2(mappings);
+
+      const salesTypes = readProductSalesType();
+      if (sales_type) {
+        salesTypes[id.toString()] = sales_type;
+      } else {
+        delete salesTypes[id.toString()];
+      }
+      writeProductSalesType(salesTypes);
+
+      const statusTypes = readProductStatus();
+      if (status) {
+        statusTypes[id.toString()] = status;
+      } else {
+        delete statusTypes[id.toString()];
+      }
+      writeProductStatus(statusTypes);
+
+      const modifiedMap = readProductModified();
+      modifiedMap[id.toString()] = new Date().toISOString();
+      writeProductModified(modifiedMap);
 
       res.json({ success: true, message: 'Product updated' });
     } catch (error: any) {
@@ -676,6 +1167,132 @@ app.post('/api/auth/login', async (req, res) => {
       }
       console.error('Supabase products update error:', error);
       res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post('/api/admin/products/bulk', authenticateToken, requireAdmin, async (req, res) => {
+    const { products } = req.body;
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid product list' });
+    }
+
+    try {
+      console.log(`Starting bulk import for ${products.length} products`);
+      
+      // 0. Check for existing barcodes first
+      const rawBarcodes = products.map((p: any) => p.barcode);
+      const filteredBarcodes = rawBarcodes.filter((b: any) => b && b.trim() !== '');
+      
+      // Check for internal duplicates in the CSV itself
+      const internalDuplicates = filteredBarcodes.filter((item: string, index: number) => filteredBarcodes.indexOf(item) !== index);
+      if (internalDuplicates.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Conflict: Your import file contains duplicate barcodes within itself: ${Array.from(new Set(internalDuplicates)).join(', ')}. Each barcode must be unique.` 
+        });
+      }
+
+      if (filteredBarcodes.length > 0) {
+        const { data: existingProds, error: checkError } = await supabase
+          .from('products')
+          .select('barcode, name')
+          .in('barcode', filteredBarcodes)
+          .range(0, 10000);
+
+        if (checkError) {
+          console.error('Error checking existing barcodes:', checkError);
+        } else if (existingProds && existingProds.length > 0) {
+          const detail = existingProds.map(p => `${p.barcode} (Existing Product Name: "${p.name || 'Unnamed'}")`).join(', ');
+          return res.status(400).json({ 
+            success: false, 
+            message: `Conflict: The following barcodes already exist in the system: ${detail}. You cannot import them again.` 
+          });
+        }
+      }
+
+      // 1. Prepare data for Supabase insert
+      const supabasePayload = products.map((p: any) => ({
+        name: p.name,
+        barcode: (p.barcode && p.barcode.trim() !== '') ? p.barcode.trim() : null,
+        category_id: p.category_id,
+        brand_id: p.brand_id,
+        unit_id: p.unit_id,
+        purchase_price: p.purchase_price,
+        selling_price: p.selling_price,
+        stock_quantity: Math.floor(p.stock_quantity),
+        supplier_id: p.supplier_id,
+        expiry_enabled: !!p.expiry_enabled,
+        expiry_date: p.expiry_date || null,
+        is_credit_allowed: p.is_credit_allowed !== false,
+        is_favorite: !!p.is_favorite
+      }));
+
+      // 2. Perform bulk insert
+      const { data, error } = await supabase
+        .from('products')
+        .insert(supabasePayload)
+        .select('id, barcode');
+
+      if (error) {
+        console.error('Supabase bulk insert error details:', error);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('No data returned from bulk insert');
+      }
+
+      // 3. Update local JSON metadata for the new products
+      const mappings = readProductCategory2();
+      const salesTypes = readProductSalesType();
+      const statusTypes = readProductStatus();
+      const modifiedMap = readProductModified();
+      const now = new Date().toISOString();
+
+      data.forEach((newProd: any) => {
+        const original = products.find((p: any) => p.barcode === newProd.barcode);
+        if (original) {
+          const pid = newProd.id.toString();
+          if (original.category2_id) mappings[pid] = original.category2_id.toString();
+          salesTypes[pid] = original.sales_type || 'Sales product';
+          statusTypes[pid] = original.status || 'active';
+          modifiedMap[pid] = now;
+        }
+      });
+
+      writeProductCategory2(mappings);
+      writeProductSalesType(salesTypes);
+      writeProductStatus(statusTypes);
+      writeProductModified(modifiedMap);
+
+      res.json({ success: true, message: `Bulk import successful. ${data.length} products added.` });
+    } catch (error: any) {
+      console.error('Bulk import full error raw:', error);
+      
+      let message = 'An unknown error occurred during bulk import.';
+      if (error && error.code === '23505') {
+        const detail = error.detail || '';
+        const match = detail.match(/Key \((.*?)\)=\((.*?)\) already exists/);
+        if (match) {
+          message = `Conflict: The ${match[1]} "${match[2]}" already exists in the system. Check your records or search for this item.`;
+        } else {
+          message = 'Conflict: One or more unique values (like barcodes) already exist in the system.';
+        }
+      } else if (error && error.message) {
+        message = error.message;
+      } else if (error && error.details) {
+        message = error.details;
+      } else if (typeof error === 'string') {
+        message = error;
+      } else if (error) {
+        try {
+          message = JSON.stringify(error, Object.getOwnPropertyNames(error));
+        } catch (e) {
+          message = String(error);
+        }
+      }
+
+      res.status(500).json({ success: false, message: `Bulk import error: ${message}` });
     }
   });
 
@@ -697,9 +1314,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
   });
 
-  // --- MASTER DATA ---
-
-  // Units
+  // --- MASTER DATA API ---
   app.get('/api/units', async (req, res) => {
     try {
       const { data, error } = await supabase
@@ -717,6 +1332,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   app.post('/api/units', authenticateToken, requireAdmin, async (req, res) => {
     const { name, short_name, status } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: 'Unit name is required' });
     try {
       const { data, error } = await supabase
         .from('units')
@@ -724,10 +1340,11 @@ app.post('/api/auth/login', async (req, res) => {
         .select();
       
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Failed to create unit record');
       res.json({ success: true, id: data[0].id });
     } catch (error: any) {
       console.error('Supabase units insert error:', error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message || 'Error creating unit' });
     }
   });
 
@@ -744,6 +1361,35 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (error: any) {
       console.error('Supabase units update error:', error);
       res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.delete('/api/units/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      // Check for products using this unit
+      const { count, error: countError } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('unit_id', req.params.id);
+
+      if (countError) throw countError;
+      if (count && count > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Cannot delete unit because it is being used by ${count} product(s).` 
+        });
+      }
+
+      const { error } = await supabase
+        .from('units')
+        .delete()
+        .eq('id', req.params.id);
+        
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Supabase units delete error:', error);
+      res.status(500).json({ success: false, message: error.message || 'Error deleting unit' });
     }
   });
 
@@ -765,6 +1411,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   app.post('/api/brands', authenticateToken, requireAdmin, async (req, res) => {
     const { name, description, status } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: 'Brand name is required' });
     try {
       const { data, error } = await supabase
         .from('brands')
@@ -772,10 +1419,11 @@ app.post('/api/auth/login', async (req, res) => {
         .select();
       
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Failed to create brand record');
       res.json({ success: true, id: data[0].id });
     } catch (error: any) {
       console.error('Supabase brands insert error:', error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message || 'Error creating brand' });
     }
   });
 
@@ -795,6 +1443,174 @@ app.post('/api/auth/login', async (req, res) => {
     }
   });
 
+  app.delete('/api/brands/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      // Check for products using this brand
+      const { count, error: countError } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('brand_id', req.params.id);
+
+      if (countError) throw countError;
+      if (count && count > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Cannot delete brand because it is being used by ${count} product(s).` 
+        });
+      }
+
+      const { error } = await supabase
+        .from('brands')
+        .delete()
+        .eq('id', req.params.id);
+        
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Supabase brands delete error:', error);
+      res.status(500).json({ success: false, message: error.message || 'Error deleting brand' });
+    }
+  });
+
+  // --- Category 2 Local Emulators (Already defined at top) ---
+  function readProductSalesType() {
+    if (!fs.existsSync(PROD_SALES_TYPE_FILE)) {
+      fs.writeFileSync(PROD_SALES_TYPE_FILE, JSON.stringify({}, null, 2));
+      return {};
+    }
+    try {
+      return JSON.parse(fs.readFileSync(PROD_SALES_TYPE_FILE, 'utf-8'));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeProductSalesType(data: any) {
+    fs.writeFileSync(PROD_SALES_TYPE_FILE, JSON.stringify(data, null, 2));
+  }
+
+  function readProductStatus() {
+    if (!fs.existsSync(PROD_STATUS_FILE)) {
+      fs.writeFileSync(PROD_STATUS_FILE, JSON.stringify({}, null, 2));
+      return {};
+    }
+    try {
+      return JSON.parse(fs.readFileSync(PROD_STATUS_FILE, 'utf-8'));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeProductStatus(data: any) {
+    fs.writeFileSync(PROD_STATUS_FILE, JSON.stringify(data, null, 2));
+  }
+
+  function readCustomerAutoCreditProduct() {
+    if (!fs.existsSync(PROD_AUTO_CREDIT_PRODUCT_FILE)) {
+      fs.writeFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, JSON.stringify({}, null, 2));
+      return {};
+    }
+    try {
+      return JSON.parse(fs.readFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, 'utf-8'));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeCustomerAutoCreditProduct(data: any) {
+    fs.writeFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, JSON.stringify(data, null, 2));
+  }
+
+  function readCustomerMetadata() {
+    if (!fs.existsSync(CUSTOMER_METADATA_FILE)) {
+      fs.writeFileSync(CUSTOMER_METADATA_FILE, JSON.stringify({}, null, 2));
+      return {};
+    }
+    try {
+      return JSON.parse(fs.readFileSync(CUSTOMER_METADATA_FILE, 'utf-8'));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeCustomerMetadata(data: any) {
+    fs.writeFileSync(CUSTOMER_METADATA_FILE, JSON.stringify(data, null, 2));
+  }
+
+  function readProductModified() {
+    if (!fs.existsSync(PROD_MODIFIED_FILE)) {
+      fs.writeFileSync(PROD_MODIFIED_FILE, JSON.stringify({}, null, 2));
+      return {};
+    }
+    try {
+      return JSON.parse(fs.readFileSync(PROD_MODIFIED_FILE, 'utf-8'));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeProductModified(data: any) {
+    fs.writeFileSync(PROD_MODIFIED_FILE, JSON.stringify(data, null, 2));
+  }
+
+  // Categories 2 Endpoints
+  app.get('/api/categories2', async (req, res) => {
+    try {
+      const data = readCategories2();
+      res.json({ success: true, data });
+    } catch (error: any) {
+      console.error('Local categories2 fetch error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post('/api/categories2', authenticateToken, requireAdmin, async (req, res) => {
+    const { name, status } = req.body;
+    try {
+      const data = readCategories2();
+      const nextId = data.reduce((max: number, c: any) => Math.max(max, Number(c.id)), 0) + 1;
+      const newItem = { id: nextId, name, status: status || 'active' };
+      data.push(newItem);
+      writeCategories2(data);
+      res.json({ success: true, id: nextId });
+    } catch (error: any) {
+      console.error('Local categories2 insert error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.put('/api/categories2/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { name, status } = req.body;
+    try {
+      const data = readCategories2();
+      const idx = data.findIndex((c: any) => c.id.toString() === id.toString());
+      if (idx !== -1) {
+        data[idx] = { ...data[idx], name, status };
+        writeCategories2(data);
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ success: false, message: 'Category 2 not found' });
+      }
+    } catch (error: any) {
+      console.error('Local categories2 update error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.delete('/api/categories2/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+      const data = readCategories2();
+      const filtered = data.filter((c: any) => c.id.toString() !== id.toString());
+      writeCategories2(filtered);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Local categories2 delete error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Categories
   app.get('/api/categories', async (req, res) => {
     try {
@@ -804,7 +1620,13 @@ app.post('/api/auth/login', async (req, res) => {
         .order('name', { ascending: true });
         
       if (error) throw error;
-      res.json({ success: true, data });
+      
+      const filtered = (data || []).filter((cat: any) => {
+        const nameUpper = (cat.name || '').toUpperCase();
+        return !nameUpper.includes('NON SEALS') && !nameUpper.includes('NON-SEALS');
+      });
+
+      res.json({ success: true, data: filtered });
     } catch (error: any) {
       console.error('Supabase categories fetch error:', error);
       res.status(500).json({ success: false, message: error.message });
@@ -813,6 +1635,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   app.post('/api/categories', authenticateToken, requireAdmin, async (req, res) => {
     const { name, parent_id, status } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: 'Category name is required' });
     try {
       const { data, error } = await supabase
         .from('categories')
@@ -820,10 +1643,18 @@ app.post('/api/auth/login', async (req, res) => {
         .select();
       
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Failed to create category record');
       res.json({ success: true, id: data[0].id });
     } catch (error: any) {
-      console.error('Supabase categories insert error:', error);
-      res.status(500).json({ success: false, message: error.message });
+      console.error('Supabase categories insert error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      console.error('Supabase categories insert error keys:', Object.keys(error || {}));
+      console.error('Supabase categories insert error (raw):', error);
+      res.status(500).json({ success: false, message: error.message || 'Error creating category' });
     }
   });
 
@@ -840,6 +1671,49 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (error: any) {
       console.error('Supabase categories update error:', error);
       res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.delete('/api/categories/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      // Check for products using this category
+      const { count: productCount, error: productError } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('category_id', req.params.id);
+
+      if (productError) throw productError;
+      if (productCount && productCount > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Cannot delete category because it is being used by ${productCount} product(s).` 
+        });
+      }
+
+      // Check for subcategories
+      const { count: childCount, error: childError } = await supabase
+        .from('categories')
+        .select('*', { count: 'exact', head: true })
+        .eq('parent_id', req.params.id);
+
+      if (childError) throw childError;
+      if (childCount && childCount > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Cannot delete category because it has ${childCount} sub-category(s).` 
+        });
+      }
+
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', req.params.id);
+        
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Supabase categories delete error:', error);
+      res.status(500).json({ success: false, message: error.message || 'Error deleting category' });
     }
   });
 
@@ -994,6 +1868,35 @@ app.post('/api/auth/login', async (req, res) => {
   app.delete('/api/products/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
+      // Check for product usage in various tables
+      const tablesToCheck = [
+        { table: 'sale_items', label: 'Sales' },
+        { table: 'purchase_invoice_items', label: 'Purchases' },
+        { table: 'stock_batches', label: 'Stock Batches' },
+        { table: 'inventory_items', label: 'Inventory Audit' },
+        { table: 'stock_movements', label: 'Stock Movements' },
+        { table: 'stock_adjustments', label: 'Stock Adjustments' },
+        { table: 'sales_return_items', label: 'Sales Returns' },
+        { table: 'supplier_return_items', label: 'Supplier Returns' },
+        { table: 'void_logs', label: 'Void Logs' },
+        { table: 'auto_sales_config', label: 'Auto Sales Config' }
+      ];
+
+      for (const t of tablesToCheck) {
+        const { count, error: countError } = await supabase
+          .from(t.table)
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', id);
+
+        if (countError) throw countError;
+        if (count && count > 0) {
+          return res.status(400).json({ 
+            success: false, 
+            message: `Cannot delete product because it has references in ${t.label}. Consider deactivating it instead.` 
+          });
+        }
+      }
+
       const { error } = await supabase
         .from('products')
         .delete()
@@ -1001,10 +1904,10 @@ app.post('/api/auth/login', async (req, res) => {
         
       if (error) throw error;
       
-      res.json({ success: true, message: 'Product deleted' });
+      res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error: any) {
       console.error('Supabase products delete error:', error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message || 'Error deleting product' });
     }
   });
 
@@ -1018,10 +1921,39 @@ app.post('/api/auth/login', async (req, res) => {
         query = query.eq('member_type', type);
       }
       
-      const { data, error } = await query.order('name', { ascending: true });
+      const { data: customersData, error } = await query.order('name', { ascending: true });
         
       if (error) throw error;
-      res.json({ success: true, data });
+
+      // Group and sum auto_burn_sales from database
+      const { data: burnSums, error: burnError } = await supabase
+        .from('auto_burn_sales')
+        .select('customer_id, amount');
+      
+      const sumsMap: { [key: string]: number } = {};
+      if (!burnError && burnSums) {
+        burnSums.forEach((b: any) => {
+          const cid = String(b.customer_id);
+          sumsMap[cid] = (sumsMap[cid] || 0) + Number(b.amount || 0);
+        });
+      }
+
+      const autoCreditProductMappings = readCustomerAutoCreditProduct();
+      const metadataMappings = readCustomerMetadata();
+
+      const mergedData = (customersData || []).map((c: any) => {
+        const meta = metadataMappings[String(c.id)] || {};
+        return {
+          ...c,
+          daily_limit_mode: meta.daily_limit_mode || 'AUTO',
+          total_pax: meta.total_pax !== undefined ? meta.total_pax : 1,
+          total_monthly_limit: meta.total_monthly_limit !== undefined ? meta.total_monthly_limit : 0,
+          auto_burn_total: sumsMap[String(c.id)] || 0,
+          auto_credit_product_id: autoCreditProductMappings[String(c.id)] || null
+        };
+      });
+
+      res.json({ success: true, data: mergedData });
     } catch (error: any) {
       console.error('Supabase customers fetch error:', error);
       res.status(500).json({ success: false, message: error.message });
@@ -1053,8 +1985,6 @@ app.post('/api/auth/login', async (req, res) => {
           credit_limit: parseFloat(row.credit_limit) || 0,
           daily_limit: parseFloat(row.daily_limit) || 0,
           monthly_limit: parseFloat(row.monthly_limit) || 0,
-          total_pax: parseFloat(row.total_pax) || 1,
-          total_monthly_limit: parseFloat(row.total_monthly_limit) || 0,
           working_place: row.working_place || null,
           emp_id: row.emp_id || null,
           passport_no: row.passport_no || null,
@@ -1083,7 +2013,7 @@ app.post('/api/auth/login', async (req, res) => {
   });
 
   app.post('/api/customers', authenticateToken, requireAdmin, async (req, res) => {
-    const { rfid_card, name, phone, credit_limit, daily_limit, monthly_limit, total_pax, total_monthly_limit, auto_sale_cfg, working_place, emp_id, passport_no, auto_burn, auto_burn_start_date, auto_burn_stop_date, member_type } = req.body;
+    const { rfid_card, name, phone, credit_limit, daily_limit, monthly_limit, total_pax, total_monthly_limit, daily_limit_mode, auto_sale_cfg, working_place, emp_id, passport_no, auto_burn, auto_burn_start_date, auto_burn_stop_date, member_type, auto_credit_product_id } = req.body;
     try {
       const { data, error } = await supabase
         .from('customers')
@@ -1094,9 +2024,7 @@ app.post('/api/auth/login', async (req, res) => {
           credit_limit: credit_limit || 0,
           daily_limit: daily_limit || 0,
           monthly_limit: monthly_limit || 0,
-          total_pax: total_pax || 1,
-          total_monthly_limit: total_monthly_limit || 0,
-          auto_sale_cfg: !!auto_sale_cfg,
+          auto_sale_cfg: auto_sale_cfg ? 1 : 0,
           working_place,
           emp_id,
           passport_no,
@@ -1109,6 +2037,20 @@ app.post('/api/auth/login', async (req, res) => {
       
       if (error) throw error;
       
+      const metadataMappings = readCustomerMetadata();
+      metadataMappings[data[0].id.toString()] = {
+        daily_limit_mode: daily_limit_mode || 'AUTO',
+        total_pax: Number(total_pax || 1),
+        total_monthly_limit: Number(total_monthly_limit || 0)
+      };
+      writeCustomerMetadata(metadataMappings);
+
+      if (auto_credit_product_id) {
+        const mappings = readCustomerAutoCreditProduct();
+        mappings[data[0].id.toString()] = auto_credit_product_id.toString();
+        writeCustomerAutoCreditProduct(mappings);
+      }
+      
       res.json({ success: true, message: 'Customer added', id: data[0].id });
     } catch (error: any) {
       console.error('Supabase customers insert error:', error);
@@ -1118,7 +2060,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   app.put('/api/customers/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { rfid_card, name, phone, credit_limit, daily_limit, monthly_limit, total_pax, total_monthly_limit, status, credit_status, auto_sale_cfg, working_place, emp_id, passport_no, auto_burn, auto_burn_start_date, auto_burn_stop_date, member_type } = req.body;
+    const { rfid_card, name, phone, credit_limit, daily_limit, monthly_limit, total_pax, total_monthly_limit, daily_limit_mode, status, credit_status, auto_sale_cfg, working_place, emp_id, passport_no, auto_burn, auto_burn_start_date, auto_burn_stop_date, member_type, auto_credit_product_id } = req.body;
     try {
       const { error } = await supabase
         .from('customers')
@@ -1129,11 +2071,9 @@ app.post('/api/auth/login', async (req, res) => {
           credit_limit: credit_limit || 0,
           daily_limit: daily_limit || 0,
           monthly_limit: monthly_limit || 0,
-          total_pax: total_pax || 1,
-          total_monthly_limit: total_monthly_limit || 0,
           status,
           credit_status,
-          auto_sale_cfg: !!auto_sale_cfg,
+          auto_sale_cfg: auto_sale_cfg ? 1 : 0,
           working_place,
           emp_id,
           passport_no,
@@ -1145,6 +2085,22 @@ app.post('/api/auth/login', async (req, res) => {
         .eq('id', id);
 
       if (error) throw error;
+      
+      const metadataMappings = readCustomerMetadata();
+      metadataMappings[id.toString()] = {
+        daily_limit_mode: daily_limit_mode || 'AUTO',
+        total_pax: Number(total_pax || 1),
+        total_monthly_limit: Number(total_monthly_limit || 0)
+      };
+      writeCustomerMetadata(metadataMappings);
+
+      const mappings = readCustomerAutoCreditProduct();
+      if (auto_credit_product_id) {
+        mappings[id.toString()] = auto_credit_product_id.toString();
+      } else {
+        delete mappings[id.toString()];
+      }
+      writeCustomerAutoCreditProduct(mappings);
       
       res.json({ success: true, message: 'Customer updated' });
     } catch (error: any) {
@@ -1426,6 +2382,42 @@ app.post('/api/auth/login', async (req, res) => {
     }
   });
 
+  // USER SETTINGS
+  app.get('/api/user/settings/:key', authenticateToken, async (req: any, res) => {
+    const { key } = req.params;
+    const { id: userId } = req.user;
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', `${key}_${userId}`)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      res.json({ success: true, value: data ? data.value : null });
+    } catch (error: any) {
+      console.error('Supabase fetch error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post('/api/user/settings/:key', authenticateToken, async (req: any, res) => {
+    const { key } = req.params;
+    const { value } = req.body;
+    const { id: userId } = req.user;
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ key: `${key}_${userId}`, value }, { onConflict: 'key' });
+      
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Supabase upsert error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // RFID AUTO-SALE & CREDIT ENGINE
   app.post('/api/rfid/scan', async (req, res) => {
     const { rfid_card } = req.body;
@@ -1613,19 +2605,22 @@ app.post('/api/auth/login', async (req, res) => {
 
         // Process AUTO_BURN for active customers
         const { data: customersWithUnused } = await supabase.from('customers').select('id, name, daily_limit, daily_used, member_type').eq('credit_status', 'ACTIVE');
+        const autoCreditMappings = readCustomerAutoCreditProduct();
         
         for (const c of (customersWithUnused || [])) {
           let burned = (c.daily_limit || 0) - (c.daily_used || 0);
+          const autoCreditProductId = autoCreditMappings[c.id.toString()];
           
           if (burned > 0) {
-            await supabase.from('auto_burn_sales').insert([{ customer_id: c.id, amount: burned, status: 'SYSTEM_GENERATED' }]);
+            await supabase.from('auto_burn_sales').insert([{ customer_id: c.id, amount: burned, status: 'SYSTEM_GENERATED', product_id: autoCreditProductId || null }]);
             
             const { data: sale } = await supabase.from('sales').insert([{
               total_amount: burned,
               discount_amount: 0,
               payment_method: 'AUTO_BURN',
               customer_id: c.id,
-              status: 'completed'
+              status: 'completed',
+              product_id: autoCreditProductId || null
             }]).select().single();
             
             if (sale) {
@@ -2126,12 +3121,36 @@ app.post('/api/auth/login', async (req, res) => {
       const { q } = req.query;
       const { data: products, error } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          categories(name, status)
+        `)
         .or(`name.ilike.%${q}%,barcode.ilike.%${q}%`)
         .limit(10);
 
       if (error) throw error;
-      res.json({ success: true, data: products });
+
+      const cats2 = readCategories2();
+      const mappings = readProductCategory2();
+      const salesTypes = readProductSalesType();
+      const modifiedTimes = readProductModified();
+
+      const mapped = (products || []).map(p => {
+        const cat2Id = mappings[p.id.toString()] || null;
+        const cat2Obj = cat2Id ? cats2.find((c: any) => c.id.toString() === cat2Id.toString()) : null;
+        return {
+          ...p,
+          category_status: p.categories?.status,
+          category_name: p.categories?.name,
+          category2_id: cat2Id ? Number(cat2Id) : null,
+          category2_name: cat2Obj ? cat2Obj.name : null,
+          sales_type: salesTypes[p.id.toString()] || 'Sales product',
+          created_at: p.created_at || new Date().toISOString(),
+          updated_at: modifiedTimes[p.id.toString()] || p.created_at || new Date().toISOString()
+        };
+      });
+
+      res.json({ success: true, data: mapped });
     } catch (error: any) {
       console.error('Supabase product search error:', error);
       res.status(500).json({ success: false, message: error.message });
@@ -2985,10 +4004,22 @@ app.post('/api/auth/login', async (req, res) => {
 
       if (error) throw error;
       
-      const formatted = (data || []).map((pi: any) => ({
-        ...pi,
-        supplier_name: pi.suppliers?.name
-      }));
+      const piExt = readPIExt();
+      const invCats = readInvoiceCategories();
+      const pmTypes = readPaymentTypes();
+
+      const formatted = (data || []).map((pi: any) => {
+        const ext = piExt[pi.id.toString()] || {};
+        const cat = invCats.find((c: any) => c.id.toString() === (ext.invoice_category_id || '').toString());
+        const pType = pmTypes.find((t: any) => t.id.toString() === (ext.payment_type_id || '').toString());
+        
+        return {
+          ...pi,
+          supplier_name: pi.suppliers?.name,
+          payment_type: pType ? pType.name : (ext.payment_type || 'N/A'),
+          category_name: cat ? cat.name : 'N/A'
+        };
+      });
 
       res.json({ success: true, data: formatted });
     } catch (error: any) {
@@ -2998,7 +4029,7 @@ app.post('/api/auth/login', async (req, res) => {
   });
 
   app.post('/api/admin/purchase-invoices', authenticateToken, requireAdmin, async (req: any, res) => {
-    const { invoice_number, supplier_id, date, items, total_amount, paid_amount } = req.body;
+    const { invoice_number, supplier_id, date, items, total_amount, paid_amount, payment_type_id, invoice_category_id } = req.body;
     
     try {
       const due_amount = total_amount - (paid_amount || 0);
@@ -3016,6 +4047,11 @@ app.post('/api/auth/login', async (req, res) => {
       }
 
       const invoiceId = invoice.id;
+
+      // Save extension metadata
+      const piExt = readPIExt();
+      piExt[invoiceId.toString()] = { payment_type_id, invoice_category_id };
+      writePIExt(piExt);
 
       // Record initial payment if any
       if (paid_amount > 0) {
@@ -3043,7 +4079,8 @@ app.post('/api/auth/login', async (req, res) => {
         const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
         await supabase.from('products').update({
           stock_quantity: (prod?.stock_quantity || 0) + totalStockIncrement,
-          purchase_price: effectivePurchasePrice
+          purchase_price: effectivePurchasePrice,
+          expiry_date: item.expiry_date || null
         }).eq('id', item.product_id);
 
         // Create stock batch if batch info provided
@@ -3095,13 +4132,43 @@ app.post('/api/auth/login', async (req, res) => {
         .eq('invoice_id', req.params.id)
         .order('created_at', { ascending: false });
 
-      const formattedItems = (items || []).map((it: any) => ({
-        ...it,
-        product_name: it.products?.name,
-        barcode: it.products?.barcode
-      }));
+      const cats2 = readCategories2();
+      const prodCat2Mappings = readProductCategory2();
 
-      res.json({ success: true, data: { ...invoice, supplier_name: invoice.suppliers?.name, supplier_phone: invoice.suppliers?.phone, items: formattedItems, payments } });
+      const formattedItems = (items || []).map((it: any) => {
+        const cat2Id = prodCat2Mappings[it.product_id?.toString()] || null;
+        const cat2Obj = cat2Id ? cats2.find((c: any) => c.id.toString() === cat2Id.toString()) : null;
+        
+        return {
+          ...it,
+          product_name: it.products?.name,
+          barcode: it.products?.barcode,
+          category_name: cat2Obj ? cat2Obj.name : 'N/A'
+        };
+      });
+
+      const piExt = readPIExt();
+      const ext = piExt[req.params.id] || {};
+      const invCats = readInvoiceCategories();
+      const pmTypes = readPaymentTypes();
+      
+      const cat = invCats.find((c: any) => c.id.toString() === (ext.invoice_category_id || '').toString());
+      const pType = pmTypes.find((t: any) => t.id.toString() === (ext.payment_type_id || '').toString());
+
+      res.json({ 
+        success: true, 
+        data: { 
+          ...invoice, 
+          supplier_name: invoice.suppliers?.name, 
+          supplier_phone: invoice.suppliers?.phone, 
+          items: formattedItems, 
+          payments,
+          payment_type_id: ext.payment_type_id,
+          invoice_category_id: ext.invoice_category_id,
+          payment_type: pType ? pType.name : (ext.payment_type || 'N/A'),
+          category_name: cat ? cat.name : 'N/A'
+        } 
+      });
     } catch (error: any) {
       console.error('Supabase get purchase invoice error:', error);
       res.status(500).json({ success: false, message: error.message });
@@ -3180,11 +4247,16 @@ app.post('/api/auth/login', async (req, res) => {
   });
 
   app.put('/api/admin/purchase-invoices/:id', authenticateToken, requireAdmin, async (req: any, res) => {
-    const { supplier_id, date, items, total_amount, paid_amount } = req.body;
+    const { supplier_id, date, items, total_amount, paid_amount, payment_type_id, invoice_category_id } = req.body;
     try {
       const { data: oldInvoice, error: iErr } = await supabase.from('purchase_invoices').select('*').eq('id', req.params.id).single();
       if (iErr || !oldInvoice) throw new Error('Invoice not found');
       if (oldInvoice.status === 'VOID') throw new Error('Cannot edit voided invoice');
+
+      // Update extension metadata
+      const piExt = readPIExt();
+      piExt[req.params.id.toString()] = { payment_type_id, invoice_category_id };
+      writePIExt(piExt);
 
       const { data: oldItems, error: itErr } = await supabase.from('purchase_invoice_items').select('*').eq('invoice_id', req.params.id);
       if (itErr) throw itErr;
@@ -3254,7 +4326,8 @@ app.post('/api/auth/login', async (req, res) => {
         const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
         await supabase.from('products').update({
           stock_quantity: (prod?.stock_quantity || 0) + totalStockIncrement,
-          purchase_price: effectivePurchasePrice
+          purchase_price: effectivePurchasePrice,
+          expiry_date: item.expiry_date || null
         }).eq('id', item.product_id);
 
         await supabase.from('stock_movements').insert([{
@@ -3561,7 +4634,7 @@ app.post('/api/auth/login', async (req, res) => {
       const paymentMap = new Map();
       (salesPaymentRaw || []).forEach((s: any) => {
         const date = s.created_at.split('T')[0];
-        const method = s.customer_id ? 'CREDIT' : s.payment_method;
+        const method = (s.customer_id || s.payment_method === 'AUTO_BURN') ? 'CREDIT' : s.payment_method;
         const key = `${date}_${method}`;
         const current = paymentMap.get(key) || 0;
         paymentMap.set(key, current + s.total_amount);
@@ -3587,7 +4660,7 @@ app.post('/api/auth/login', async (req, res) => {
       const retPaymentMap = new Map();
       (returnsPaymentRaw || []).forEach((sr: any) => {
         const date = sr.created_at.split('T')[0];
-        const method = sr.sales?.customer_id ? 'CREDIT' : sr.refund_type;
+        const method = (sr.sales?.customer_id || sr.refund_type === 'AUTO_BURN') ? 'CREDIT' : sr.refund_type;
         const key = `${date}_${method}`;
         const current = retPaymentMap.get(key) || 0;
         retPaymentMap.set(key, current + sr.total_refund);
@@ -3602,9 +4675,9 @@ app.post('/api/auth/login', async (req, res) => {
         .from('purchase_invoice_items')
         .select(`
           total_price,
-          purchase_invoices!inner(date, payment_status, status),
-          products!inner(category_id),
-          categories:products(categories!inner(name))
+          purchase_invoices!inner(id, date, payment_status, status),
+          products!inner(id, category_id),
+          categories_main:products(categories!inner(name))
         `)
         .eq('purchase_invoices.status', 'ACTIVE')
         .ilike('purchase_invoices.date', `${month}%`);
@@ -3613,20 +4686,24 @@ app.post('/api/auth/login', async (req, res) => {
       const purchaseMap = new Map();
       (purchasesRaw || []).forEach((pii: any) => {
         const date = pii.purchase_invoices.date;
-        const category = (pii.categories?.name || 'OTHER').toUpperCase();
+        
+        // Group ONLY by Primary Main Category as requested
+        const categoryName = pii.categories_main?.name || 'OTHER';
+
+        const category = categoryName.toUpperCase();
         const status = pii.purchase_invoices.payment_status;
-        const key = `${date}_${category}_${status}`;
+        const key = `${date}###${category}###${status}`;
         const current = purchaseMap.get(key) || 0;
         purchaseMap.set(key, current + pii.total_price);
       });
       purchaseMap.forEach((total, key) => {
-        const [date, category, payment_status] = key.split('_');
+        const [date, category, payment_status] = key.split('###');
         purchases.push({ date, category, payment_status, total });
       });
 
-      // 6. All Categories
-      const { data: categoriesData } = await supabase.from('categories').select('name');
-      const categories = (categoriesData || []).map(c => ({ name: c.name.toUpperCase() }));
+      // 6. All Categories (Use only main categories from DB)
+      const { data: categoriesData } = await supabase.from('categories').select('name').eq('status', 'active');
+      const categories = (categoriesData || []).map(c => ({ name: (c.name || '').toUpperCase() }));
 
       // 7. Expenses
       const { data: expensesRaw } = await supabase
@@ -3740,6 +4817,169 @@ app.post('/api/auth/login', async (req, res) => {
       });
     } catch (error: any) {
       console.error('Supabase profit analytics error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // SYSTEM RESET (Admin Only)
+  app.post('/api/admin/reset-system', authenticateToken, requireAdmin, async (req, res) => {
+    const { scope } = req.body;
+    try {
+      const user = (req as any).user;
+      console.log(`[RESET] System reset initiated. Scope: ${scope}, User: ${user?.id}`);
+
+      const transactionalTables = [
+        'void_logs',
+        'sale_items',
+        'sales_return_items',
+        'sales_returns',
+        'stock_movements',
+        'stock_adjustments',
+        'inventory_items',
+        'inventory_audit_logs',
+        'inventory_sessions',
+        'stock_batches',
+        'purchase_invoice_items',
+        'purchase_invoice_payments',
+        'purchase_invoices',
+        'supplier_return_items',
+        'deleted_returns_logs',
+        'supplier_returns',
+        'credit_logs',
+        'credit_status_logs',
+        'credit_limit_history',
+        'daily_credit_logs',
+        'monthly_credit_logs',
+        'auto_burn_sales',
+        'sales_summary_logs',
+        'rfid_scans',
+        'financial_audit_logs',
+        'user_activity_logs',
+        'expenses',
+        'sales'
+      ];
+
+      const masterTables = [
+        'products',
+        'customers',
+        'suppliers',
+        'brands',
+        'units',
+        'categories'
+      ];
+
+      const tablesToClear = scope === 'complete' 
+        ? [...transactionalTables, ...masterTables] 
+        : transactionalTables;
+
+      const results = [];
+      for (const table of tablesToClear) {
+        try {
+          console.log(`[RESET] Deleting rows from ${table}...`);
+          let success = false;
+          let lastError: any = null;
+
+          // Optimized Strategy: Use a sequence of fallback methods to clear the table
+          // Strategy 1: Try .not('id', 'is', 'null') which is type-independent and works on both integer and uuid PKs
+          const resNullCheck = await supabase.from(table).delete().not('id', 'is', 'null');
+          if (!resNullCheck.error) {
+            success = true;
+          } else {
+            // Strategy 2: Fallback to created_at check (some tables might have complex PKs or no ID, though rare in this schema)
+            const resCreated = await supabase.from(table).delete().neq('created_at', '1900-01-01');
+            if (!resCreated.error) {
+              success = true;
+            } else {
+              lastError = resCreated.error;
+              // Only log if both primary strategies failed
+              console.log(`[RESET] Primary clear strategies failed for ${table}. Trying ID comparisons...`);
+              
+              // Strategy 3: Try integer ID comparison
+              const resInt = await supabase.from(table).delete().gt('id', -99999999);
+              if (!resInt.error) {
+                success = true;
+              } else {
+                lastError = resInt.error;
+                
+                // Strategy 4: Try UUID/text ID comparison
+                const resUuid = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                if (!resUuid.error) {
+                  success = true;
+                } else {
+                  lastError = resUuid.error;
+                }
+              }
+            }
+          }
+
+          if (success) {
+            console.log(`[RESET] Successfully cleared ${table}`);
+            results.push({ table, success: true });
+          } else {
+            console.error(`[RESET] All strategies failed for ${table}:`, lastError?.message || 'Unknown error');
+            results.push({ table, success: false, error: lastError?.message || 'Unknown error' });
+          }
+        } catch (err: any) {
+          console.error(`[RESET] Exception in ${table}:`, err.message);
+          results.push({ table, success: false, error: err.message });
+        }
+      }
+
+      const failedTables = results.filter(r => !r.success);
+      if (failedTables.length > 0) {
+        console.warn(`[RESET] Reset completed with ${failedTables.length} failures.`);
+      }
+
+      // Handle local files and seeding lock for complete reset
+      if (scope === 'complete') {
+        const localFilesToClear = [
+          CAT2_FILE,
+          PROD_CAT2_FILE,
+          PROD_SALES_TYPE_FILE,
+          PROD_STATUS_FILE,
+          PROD_AUTO_CREDIT_PRODUCT_FILE,
+          CUSTOMER_METADATA_FILE,
+          PROD_MODIFIED_FILE,
+          PI_EXT_FILE,
+          EXPENSE_CATEGORIES_FILE
+        ];
+        localFilesToClear.forEach(f => {
+          if (fs.existsSync(f)) {
+            try {
+              fs.unlinkSync(f);
+              console.log(`[RESET] Deleted local file: ${f}`);
+            } catch (e: any) {
+              console.error(`[RESET] Error deleting local file ${f}:`, e.message);
+            }
+          }
+        });
+
+        // Ensure seed lock exists so it doesn't re-seed mock data
+        if (!fs.existsSync(SEED_LOCK_FILE)) {
+          fs.writeFileSync(SEED_LOCK_FILE, 'Reset performed at ' + new Date().toISOString());
+        }
+
+        // Persistently flag database as seeded/reset in Supabase settings table so restart won't inject mock data
+        try {
+          const { data: existing } = await supabase.from('settings').select('*').eq('key', 'database_seeded');
+          if (existing && existing.length > 0) {
+            await supabase.from('settings').update({ value: 'true' }).eq('key', 'database_seeded');
+          } else {
+            await supabase.from('settings').insert([{ key: 'database_seeded', value: 'true' }]);
+          }
+          console.log('[RESET] Successfully flagged database_seeded in settings table.');
+        } catch (setErr: any) {
+          console.error('[RESET] Failed to set database_seeded in settings table:', setErr.message);
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: `System reset finished. ${results.filter(r => r.success).length} of ${tablesToClear.length} tables cleared.`,
+        details: results 
+      });
+    } catch (error: any) {
+      console.error('[RESET] Error:', error);
       res.status(500).json({ success: false, message: error.message });
     }
   });

@@ -14,6 +14,7 @@ export default function CreditCustomers() {
   const [showForm, setShowForm] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
   const [customerToDelete, setCustomerToDelete] = useState<number | null>(null);
   
   // Import States
@@ -25,9 +26,10 @@ export default function CreditCustomers() {
   const [formData, setFormData] = useState({
     id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', 
     working_place: '', emp_id: '', passport_no: '', 
-    daily_limit: '0', daily_limit_mode: 'MANUAL', monthly_limit: '0', 
+    daily_limit: '0', daily_limit_mode: 'AUTO', monthly_limit: '0', 
     total_pax: '1', total_monthly_limit: '0',
-    auto_burn: false, auto_burn_start_date: '', auto_burn_stop_date: ''
+    auto_burn: false, auto_burn_start_date: '', auto_burn_stop_date: '',
+    auto_credit_product_id: ''
   });
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -66,7 +68,18 @@ export default function CreditCustomers() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchCustomers(); }, []);
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) setProducts(data.data);
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => { 
+    fetchCustomers();
+    fetchProducts();
+  }, []);
 
   const confirmDeleteCustomer = async () => {
     if (!customerToDelete) return;
@@ -117,7 +130,8 @@ export default function CreditCustomers() {
           total_pax: Number(formData.total_pax || 1),
           total_monthly_limit: Number(formData.total_monthly_limit || 0),
           auto_burn: formData.auto_burn ? 1 : 0,
-          member_type: 'WALKIN'
+          member_type: 'WALKIN',
+          auto_credit_product_id: formData.auto_credit_product_id || null
         })
       });
       const data = await res.json();
@@ -212,6 +226,7 @@ export default function CreditCustomers() {
                     <th className="py-3 px-4 font-black">Daily Limit</th>
                     <th className="py-3 px-4 font-black">Monthly Limit</th>
                     <th className="py-3 px-4 font-black">Auto Burn</th>
+                    <th className="py-3 px-4 font-black">Auto Credit Products</th>
                     <th className="py-3 px-4 font-black no-print">Actions</th>
                 </tr>
             </thead>
@@ -224,6 +239,7 @@ export default function CreditCustomers() {
                         <td className="py-3 px-4">{c.daily_limit}</td>
                         <td className="py-3 px-4">{c.monthly_limit}</td>
                         <td className="py-3 px-4">{c.auto_burn ? 'YES' : 'NO'}</td>
+                        <td className="py-3 px-4">{products.find(p => p.id.toString() === c.auto_credit_product_id?.toString())?.name || '-'}</td>
                         <td className="py-3 px-4 flex gap-2 no-print">
                           <button 
                             onClick={() => { 
@@ -243,7 +259,8 @@ export default function CreditCustomers() {
                                   total_monthly_limit: c.total_monthly_limit?.toString() || '0',
                                   auto_burn: !!c.auto_burn,
                                   auto_burn_start_date: c.auto_burn_start_date || '',
-                                  auto_burn_stop_date: c.auto_burn_stop_date || ''
+                                  auto_burn_stop_date: c.auto_burn_stop_date || '',
+                                  auto_credit_product_id: c.auto_credit_product_id || ''
                                 }); 
                                 setShowForm(true); 
                               }}
@@ -380,6 +397,17 @@ export default function CreditCustomers() {
                     <div className="space-y-1">
                         <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Auto Burn Stop Date</label>
                         <input type="date" className="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.auto_burn_stop_date || ''} onChange={e => setFormData({...formData, auto_burn_stop_date: e.target.value})} />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Auto Credit Products</label>
+                       <select
+                           value={formData.auto_credit_product_id || ''}
+                           onChange={e => setFormData({...formData, auto_credit_product_id: e.target.value})}
+                           className="w-full border border-slate-300 rounded p-3 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                       >
+                           <option value="">Select product...</option>
+                           {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                       </select>
                     </div>
                     
                     <button type="submit" className="md:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white py-4 font-black rounded text-sm tracking-widest uppercase transition-colors mt-4">Save Customer Information</button>

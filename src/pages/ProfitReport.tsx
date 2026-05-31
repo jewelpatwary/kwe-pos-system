@@ -143,16 +143,7 @@ export default function ProfitReport() {
         </table>
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div className="flex gap-4">
-            <span className="flex items-center gap-1 uppercase">PERIOD_REVENUE: <span className="text-slate-900">{currency.symbol}{(data?.summary?.totalSales || 0).toFixed(2)}</span></span>
-            <span className="flex items-center gap-1 uppercase">PERIOD_NET: <span className={`underline underline-offset-2 ${(data?.summary?.netProfit || 0) < 0 ? 'text-red-600 ' : 'text-emerald-600 '}`}>{currency.symbol}{(data?.summary?.netProfit || 0).toFixed(2)}</span></span>
-         </div>
-         <div className="flex items-center gap-2 uppercase">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500" />
-            <span>VERIFIED_P&L_AUDIT : {new Date().toISOString()}</span>
-         </div>
-      </div>
+
     </div>
   );
 }

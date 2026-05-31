@@ -21,12 +21,14 @@ export default function Customers() {
   const [multiplier, setMultiplier] = useState('1.0');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', 
-    daily_limit: '0', daily_limit_mode: 'MANUAL', monthly_limit: '0', 
+    daily_limit: '0', daily_limit_mode: 'AUTO', monthly_limit: '0', 
     total_pax: '1', total_monthly_limit: '0',
     status: 'active', credit_status: 'ACTIVE', auto_sale_cfg: false,
+    auto_credit_product_id: '',
     working_place: '', emp_id: '', passport_no: '', auto_burn: false, auto_burn_start_date: '', auto_burn_stop_date: ''
   });
 
@@ -70,6 +72,14 @@ export default function Customers() {
     finally { setLoading(false); }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) setProducts(data.data);
+    } catch (err) { console.error(err); }
+  };
+
   const fetchSettings = async () => {
     try {
       const res = await fetch('/api/admin/credit-settings', { headers: { 'Authorization': `Bearer ${token}` } });
@@ -80,6 +90,7 @@ export default function Customers() {
 
   useEffect(() => { 
     fetchCustomers(); 
+    fetchProducts();
     fetchSettings();
   }, []);
 
@@ -101,6 +112,7 @@ export default function Customers() {
           total_pax: Number(formData.total_pax || 1),
           total_monthly_limit: Number(formData.total_monthly_limit || 0),
           auto_sale_cfg: formData.auto_sale_cfg,
+          auto_credit_product_id: formData.auto_credit_product_id || null,
           member_type: 'DELIVERY'
         })
       });
@@ -141,12 +153,13 @@ export default function Customers() {
       credit_limit: (c.credit_limit || 0).toString(),
       daily_limit: (c.daily_limit || 0).toString(),
       monthly_limit: (c.monthly_limit || 0).toString(),
-      daily_limit_mode: c.daily_limit_mode || 'MANUAL',
+      daily_limit_mode: c.daily_limit_mode || 'AUTO',
       total_pax: (c.total_pax || 1).toString(),
       total_monthly_limit: (c.total_monthly_limit || 0).toString(),
       status: c.status,
       credit_status: c.credit_status || 'ACTIVE',
       auto_sale_cfg: c.auto_sale_cfg === 1,
+      auto_credit_product_id: c.auto_credit_product_id || '',
       working_place: c.working_place || '',
       emp_id: c.emp_id || '',
       passport_no: c.passport_no || '',
@@ -276,7 +289,7 @@ export default function Customers() {
                 onClick={() => {
                    setFormData({ 
                      id: '', name: '', rfid_card: '', phone: '', credit_limit: '0', 
-                     daily_limit: '0', daily_limit_mode: 'MANUAL', monthly_limit: '0', 
+                     daily_limit: '0', daily_limit_mode: 'AUTO', monthly_limit: '0', 
                      total_pax: '1', total_monthly_limit: '0',
                      status: 'active', credit_status: 'ACTIVE', auto_sale_cfg: false,
                      working_place: '', emp_id: '', passport_no: '', 
@@ -300,9 +313,10 @@ export default function Customers() {
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200">
               <tr className="text-slate-500 bg-slate-50/80 backdrop-blur-md transition-colors">
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center w-12">SL</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">EMP ID</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">Member Profile</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Occupation</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">Working Place</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">Passport No</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">RFID Number</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">Contact Number</th>
@@ -310,16 +324,19 @@ export default function Customers() {
                 <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Monthly Limit</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Daily Limit</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Auto Burn Status</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Auto Credit Products</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Start Date</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200 text-center">End Date</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Auto Burn Total</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Balance</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Total Credited</th>
                 <th className="py-4 px-6 font-black text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 transition-colors">
-              {filtered.map((c) => (
+              {filtered.map((c, idx) => (
                 <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
+                  <td className="py-4 px-6 border-r border-slate-100 font-black text-slate-500 text-center">
+                    {idx + 1}
+                  </td>
                   <td className="py-4 px-6 border-r border-slate-100 font-black text-slate-400">
                     <div className="flex items-center gap-1.5">{c.emp_id || '-'}</div>
                   </td>
@@ -359,30 +376,22 @@ export default function Customers() {
                       </span>
                     </div>
                   </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-center text-slate-700">
+                    {products.find(p => p.id.toString() === c.auto_credit_product_id?.toString())?.name || '-'}
+                  </td>
                   <td className="py-4 px-6 border-r border-slate-100 font-bold text-center text-slate-500">
                     {c.auto_burn && c.auto_burn_start_date ? new Date(c.auto_burn_start_date).toLocaleDateString() : '-'}
                   </td>
                   <td className="py-4 px-6 border-r border-slate-100 font-bold text-center text-slate-500">
                     {c.auto_burn && c.auto_burn_stop_date ? new Date(c.auto_burn_stop_date).toLocaleDateString() : '-'}
                   </td>
-                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-center">
-                      <button onClick={() => { setShowAutoBurnLogs(c); fetchAutoBurnData(c.id); }} className="text-indigo-600 hover:text-indigo-800 font-black text-[9px] underline underline-offset-2">VIEW_LOGS</button>
-                  </td>
-                  <td className="py-4 px-6 border-r border-slate-100">
-                    <div className={c.current_balance > 0 ? 'text-red-600  font-black' : 'text-emerald-600  font-black'}>
-                        {currency.symbol}{c.current_balance.toFixed(2)}
-                    </div>
-                    <div className="w-full max-w-[80px] h-0.5 bg-slate-100 mt-1 overflow-hidden relative">
-                         <div 
-                            className="absolute left-0 h-full bg-indigo-500 transition-all duration-1000" 
-                            style={{ width: `${Math.min(100, (c.current_balance / (c.credit_limit || 1)) * 100)}%` }} 
-                        />
-                    </div>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-center text-slate-700">
+                    {currency.symbol}{(c.auto_burn_total || 0).toFixed(2)}
                   </td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-20 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setShowManageCredit(c); fetchCreditManageData(c.id); }} className="p-1.5 text-slate-400 hover:text-indigo-600" title="Manage Credit"><ShieldAlert className="w-4 h-4" /></button>
-                      <button onClick={() => setShowPaymentFor(c)} disabled={c.current_balance <= 0} className="p-1.5 text-slate-400 hover:text-emerald-600 disabled:opacity-30" title="Accept Payment"><DollarSign className="w-4 h-4" /></button>
+                      <button onClick={() => { setShowAutoBurnLogs(c); fetchAutoBurnData(c.id); }} className="p-1.5 text-slate-400 hover:text-indigo-650 animate-pulse" title="View Auto Burn Logs"><History className="w-4 h-4" /></button>
                       <button onClick={() => handleEdit(c)} className="p-1.5 text-slate-400 hover:text-slate-600"><Edit2 className="w-4 h-4" /></button>
                     </div>
                   </td>
@@ -390,7 +399,7 @@ export default function Customers() {
               ))}
               {filtered.length === 0 && !loading && (
                 <tr>
-                   <td colSpan={15} className="py-20 text-center font-black text-slate-300 tracking-[0.5em]">NO MEMBERS FOUND</td>
+                   <td colSpan={16} className="py-20 text-center font-black text-slate-300 tracking-[0.5em]">NO MEMBERS FOUND</td>
                 </tr>
               )}
             </tbody>
@@ -398,10 +407,7 @@ export default function Customers() {
         )}
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div>MEMBERS (DELIVERY FOOD) DIRECTORY • {customers.length} REGISTERED MEMBERS</div>
-         <div>SYSTEM ACTIVE • {new Date().toISOString()}</div>
-      </div>
+
 
       {showForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 bg-slate-900/40 backdrop-blur-sm">
@@ -513,6 +519,17 @@ export default function Customers() {
                             </div>
                         </>
                     )}
+                    <div className="space-y-1 col-span-2">
+                       <label className="text-slate-500 text-[9px] font-black uppercase">Auto Credit Products</label>
+                       <select
+                           value={formData.auto_credit_product_id || ''}
+                           onChange={e => setFormData({...formData, auto_credit_product_id: e.target.value})}
+                           className="w-full border border-slate-200 text-slate-900 px-3 py-1.5 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                       >
+                           <option value="">Select product...</option>
+                           {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                       </select>
+                    </div>
                     <div className="space-y-1 col-span-2 mt-2">
                         <label className="flex items-center gap-2 cursor-pointer p-2 border border-slate-200 rounded hover:bg-slate-50 transition-colors select-none">
                             <input 
@@ -566,9 +583,23 @@ export default function Customers() {
                  <button onClick={() => setShowPaymentFor(null)} className="text-slate-400 hover:text-slate-700 transition"><X size={16}/></button>
               </div>
               <div className="p-6">
-                 <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded text-center">
-                    <span className="text-slate-500 font-black text-[8px] uppercase tracking-widest block mb-1">Current Debt</span>
-                    <span className="text-2xl font-black text-red-600 italic tracking-tighter">{currency.symbol}{showPaymentFor.current_balance.toFixed(2)}</span>
+                 <div className={`mb-6 p-4 ${showPaymentFor.current_balance > 0 ? 'bg-red-50 border-red-100 text-red-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600'} border rounded text-center`}>
+                    <span className="text-slate-500 font-black text-[8px] uppercase tracking-widest block mb-1">
+                      {showPaymentFor.current_balance > 0 ? 'Current Outstanding Debt' : 'Outstanding Debt'}
+                    </span>
+                    <span className="text-2xl font-black italic tracking-tighter block">
+                      {currency.symbol}{showPaymentFor.current_balance.toFixed(2)}
+                    </span>
+                    {showPaymentFor.current_balance <= 0 && (
+                      <p className="text-[7px] text-emerald-600 font-black mt-2 tracking-wider leading-relaxed">
+                        THIS MEMBER HAS NO OUTSTANDING DEBT. Settle payments anyway to pre-fund/credit their limits.
+                      </p>
+                    )}
+                    {showPaymentFor.current_balance > 0 && (
+                      <p className="text-[7px] text-red-500 font-black mt-2 tracking-wider leading-relaxed">
+                        Use this to register payment received toward clearing member's credit balance.
+                      </p>
+                    )}
                  </div>
                  <div className="space-y-4">
                     <div className="space-y-1 text-center">

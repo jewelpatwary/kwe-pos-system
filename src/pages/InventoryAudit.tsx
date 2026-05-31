@@ -537,7 +537,7 @@ export default function InventoryAudit() {
                             <th className="px-6 py-3 text-center">PHYSICAL_COUNT</th>
                             <th className="px-6 py-3 text-center">VARIANCE</th>
                             <th className="px-6 py-3 text-right">VALUE_DIFF</th>
-                            <th className="px-6 py-3"></th>
+                            <th className="px-6 py-3 text-right">{activeSession.status !== 'COMPLETED' && 'ACTIONS'}</th>
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -589,7 +589,8 @@ export default function InventoryAudit() {
                                      {currency.symbol}{item.value_difference.toFixed(2)}
                                   </td>
                                   <td className="px-6 py-4 text-right">
-                                     <div className="flex items-center justify-end gap-3">
+                                     {activeSession.status !== 'COMPLETED' && (
+                                        <div className="flex items-center justify-end gap-3">
                                         {editingItemId === item.id ? (
                                            <>
                                               <button 
@@ -629,6 +630,7 @@ export default function InventoryAudit() {
                                            </>
                                         )}
                                      </div>
+                                    )}
                                   </td>
                                </tr>
                             ))
@@ -728,7 +730,7 @@ export default function InventoryAudit() {
                            <th className="px-6 py-4">INSPECTOR</th>
                            <th className="px-6 py-4 text-center">STATUS</th>
                            <th className="px-6 py-4 text-right">VARIANCE</th>
-                           <th className="px-6 py-4"></th>
+                           <th className="px-6 py-4 text-right">ACTIONS</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-100">

@@ -48,7 +48,7 @@ export default function StockAdjustment() {
       });
       const data = await res.json();
       if (data.success) {
-        setSessions(data.data.filter((s:any) => s.status === 'COMPLETED'));
+        setSessions(data.data);
       }
     } catch (err) {
       console.error(err);
@@ -117,9 +117,28 @@ export default function StockAdjustment() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProduct || !quantity || !reason) {
-       setError('FILL_ALL_REQUIRED_FIELDS');
-       return;
+    setError('');
+    setSuccess('');
+
+    if (activeTab === 'MANUAL') {
+      if (!selectedProduct) {
+        setError('SELECT_A_PRODUCT_FIRST');
+        return;
+      }
+      if (!quantity) {
+        setError('ENTER_QUANTITY');
+        return;
+      }
+    } else {
+      if (!selectedAuditItem || !selectedProduct) {
+        setError('SELECT_AUDIT_ITEM_FIRST');
+        return;
+      }
+      // If the difference is 0 (already matched), tell the user they don't need adjustment
+      if (selectedAuditItem.difference === 0) {
+        setError('NO_DIFFERENCE_TO_ADJUST');
+        return;
+      }
     }
 
     const qty = parseFloat(quantity);
@@ -169,6 +188,10 @@ export default function StockAdjustment() {
         setSelectedProduct(null);
         setQuantity('');
         setNote('');
+        if (activeTab === 'AUDIT' && selectedSessionId) {
+          loadSessionItems(selectedSessionId);
+          setSelectedAuditItem(null);
+        }
         fetchProducts();
         fetchAdjustments();
       } else {
@@ -179,6 +202,80 @@ export default function StockAdjustment() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAdjustEntireSession = async () => {
+    if (!selectedSessionId || sessionItems.length === 0) {
+      setError('NO_ACTIVE_SESSION_TO_ADJUST');
+      return;
+    }
+
+    // Find items that have a difference, and haven't been adjusted already in our adjustments list
+    const unadjustedItems = sessionItems.filter(item => {
+      if (item.difference === 0) return false;
+      const isAlreadyAdjusted = adjustments.some(adj => adj.inventory_item_id === item.id);
+      return !isAlreadyAdjusted;
+    });
+
+    if (unadjustedItems.length === 0) {
+      alert('No unadjusted non-zero items found in this session.');
+      return;
+    }
+
+    if (!confirm(`Adjust all ${unadjustedItems.length} products in this session according to the physical count?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const item of unadjustedItems) {
+      try {
+        const payload = {
+          product_id: item.product_id,
+          adjustment_type: item.difference > 0 ? 'IN' : 'OUT',
+          quantity: Math.abs(item.difference),
+          reason: 'Correction',
+          note: `Auto-adjusted from Inventory Audit Session #${selectedSessionId}`,
+          inventory_item_id: item.id
+        };
+
+        const res = await fetch('/api/stock-adjustments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          successCount++;
+        } else {
+          failCount++;
+          console.error(`Failed to adjust ${item.name}:`, data.message);
+        }
+      } catch (err) {
+        failCount++;
+        console.error(`Network error for item ${item.name}:`, err);
+      }
+    }
+
+    if (successCount > 0) {
+      setSuccess(`SESSION_SYNC_COMPLETE: Saved ${successCount} adjustments. Failed: ${failCount}`);
+    } else {
+      setError(`SESSION_SYNC_FAILED: Failed to adjust ${failCount} items.`);
+    }
+
+    fetchProducts();
+    fetchAdjustments();
+    // reload session items to reflect updated states or simply reload
+    loadSessionItems(selectedSessionId);
+    setLoading(false);
   };
 
   return (
@@ -207,66 +304,228 @@ export default function StockAdjustment() {
         <div className="w-80 shrink-0 border-r border-slate-200 bg-white overflow-auto p-4 space-y-6">
            <form onSubmit={handleSubmit} className="space-y-6">
               <div className="flex bg-slate-100 p-1 rounded">
-                <button type="button" onClick={() => setActiveTab('MANUAL')} className={`flex-1 py-2 rounded text-[8px] font-black tracking-widest ${activeTab === 'MANUAL' ? 'bg-white shadow-sm' : ''}`}>MANUAL</button>
-                <button type="button" onClick={() => setActiveTab('AUDIT')} className={`flex-1 py-2 rounded text-[8px] font-black tracking-widest ${activeTab === 'AUDIT' ? 'bg-white shadow-sm' : ''}`}>AUDIT LOG</button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setActiveTab('MANUAL');
+                    setSelectedProduct(null);
+                    setQuantity('');
+                    setSelectedAuditItem(null);
+                    setSelectedSessionId(null);
+                    setSearch('');
+                    setSuccess('');
+                    setError('');
+                  }} 
+                  className={`flex-1 py-2 rounded text-[8px] font-black tracking-widest ${activeTab === 'MANUAL' ? 'bg-white shadow-sm' : ''}`}
+                >
+                  MANUAL
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setActiveTab('AUDIT');
+                    setSelectedProduct(null);
+                    setQuantity('');
+                    setSelectedAuditItem(null);
+                    setSelectedSessionId(null);
+                    setSearch('');
+                    setSuccess('');
+                    setError('');
+                  }} 
+                  className={`flex-1 py-2 rounded text-[8px] font-black tracking-widest ${activeTab === 'AUDIT' ? 'bg-white shadow-sm' : ''}`}
+                >
+                  AUDIT LOG
+                </button>
               </div>
 
               {activeTab === 'AUDIT' && (
                 <div className="space-y-4 animate-in fade-in">
-                  <select className="w-full bg-slate-100 border border-slate-200 rounded p-2 text-[9px]" onChange={(e) => {
-                     const sessId = parseInt(e.target.value);
-                     setSelectedSessionId(sessId);
-                     loadSessionItems(sessId);
-                  }}>
-                     <option value="">SELECT_AUDIT_SESSION</option>
-                     {sessions.map(s => <option key={s.id} value={s.id}>#{s.id} - {s.date}</option>)}
-                  </select>
-                  
-                  {sessionItems.length > 0 && (
-                     <select className="w-full bg-slate-100 border border-slate-200 rounded p-2 text-[9px]" onChange={(e) => {
-                        const item = sessionItems.find(i => i.id === parseInt(e.target.value));
-                        setSelectedAuditItem(item);
-                        setSelectedProduct({ id: item.product_id, name: item.name, barcode: item.barcode, stock_quantity: item.system_stock });
-                        setQuantity(Math.abs(item.difference).toString());
-                        setAdjustmentType(item.difference > 0 ? 'IN' : 'OUT');
-                     }}>
-                        <option value="">SELECT_AUDIT_ITEM</option>
-                        {sessionItems.map(i => <option key={i.id} value={i.id}>{i.name} (Diff: {i.difference})</option>)}
-                     </select>
+                  <div className="space-y-1">
+                    <label className="text-slate-500 font-black tracking-widest text-[8px]">SESSION_CHRONOLOGY</label>
+                    <select 
+                      className="w-full bg-slate-100 border border-slate-200 rounded p-2 text-[9px] font-black focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                      value={selectedSessionId || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) {
+                          const sessId = parseInt(val);
+                          setSelectedSessionId(sessId);
+                          loadSessionItems(sessId);
+                        } else {
+                          setSelectedSessionId(null);
+                          setSessionItems([]);
+                          setSelectedAuditItem(null);
+                        }
+                      }}
+                    >
+                      <option value="">SELECT_AUDIT_SESSION</option>
+                      {sessions.map(s => {
+                        const formattedDate = new Date(s.created_at || s.date).toLocaleDateString();
+                        return (
+                          <option key={s.id} value={s.id}>
+                            #{s.id.toString().padStart(5, '0')} — {formattedDate} ({s.status}) — VAR: {s.total_difference || 0}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {selectedSessionId && sessionItems.length > 0 && (
+                    <div className="space-y-1 animate-in fade-in">
+                      <label className="text-slate-500 font-black tracking-widest text-[8px]">SELECT_AUDIT_ITEM</label>
+                      <select 
+                        className="w-full bg-slate-100 border border-slate-200 rounded p-2 text-[9px] font-black focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                        value={selectedAuditItem?.id || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const item = sessionItems.find(i => i.id === parseInt(val));
+                            if (item) {
+                              setSelectedAuditItem(item);
+                              setSelectedProduct({ id: item.product_id, name: item.name, barcode: item.barcode, stock_quantity: item.system_stock });
+                              setQuantity(Math.abs(item.difference).toString());
+                              setAdjustmentType(item.difference > 0 ? 'IN' : 'OUT');
+                              setNote(`Auto-adjusted from Inventory Audit Session #${selectedSessionId}`);
+                              setReason('Correction');
+                            }
+                          } else {
+                            setSelectedAuditItem(null);
+                          }
+                        }}
+                      >
+                        <option value="">SELECT_AUDIT_ITEM_FROM_LIST</option>
+                        {sessionItems.map(i => {
+                          const isAdjusted = adjustments.some(adj => adj.inventory_item_id === i.id);
+                          const adjSuffix = isAdjusted ? ' [ADJUSTED]' : '';
+                          return (
+                            <option key={i.id} value={i.id}>
+                              {i.name} — (Diff: {i.difference > 0 ? '+' : ''}{i.difference}){adjSuffix}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+
+                  {selectedSessionId && (
+                    <div className="space-y-4">
+                      {/* Selected Session Header Card */}
+                      <div className="bg-indigo-50/50 border border-indigo-100 rounded p-3 relative">
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setSelectedSessionId(null);
+                            setSessionItems([]);
+                            setSelectedAuditItem(null);
+                          }} 
+                          className="absolute top-2 right-2 p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
+                          title="Deselect Session"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        <div className="text-[7px] text-indigo-500 font-black tracking-widest mb-1">SELECTED_SESSION</div>
+                        <div className="text-[10px] font-black text-slate-900 italic">#{selectedSessionId.toString().padStart(5, '0')}</div>
+                        <div className="text-[7.5px] text-slate-500 font-bold mt-1 flex justify-between items-center">
+                          <span>TOTAL OF {sessionItems.length} ITEMS AUDITED</span>
+                          <button 
+                            type="button" 
+                            onClick={handleAdjustEntireSession} 
+                            disabled={loading || sessionItems.length === 0}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-[7.5px] px-1.5 py-0.5 rounded transition-all uppercase"
+                          >
+                            Adjust Whole Session
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Display active list below the select dropdown for clean, beautiful UX */}
+                      <div className="space-y-2">
+                        <div className="text-slate-500 font-black tracking-widest text-[8px]">
+                          <span>AUDITED ITEM STATE DIRECTORY</span>
+                        </div>
+                        <div className="space-y-1.5 max-h-56 overflow-auto border border-slate-100 rounded p-1.5 bg-slate-50 custom-scrollbar">
+                          {sessionItems.map(item => {
+                            const isAdjusted = adjustments.some(adj => adj.inventory_item_id === item.id);
+                            const hasDiff = item.difference !== 0;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAuditItem(item);
+                                  setSelectedProduct({ id: item.product_id, name: item.name, barcode: item.barcode, stock_quantity: item.system_stock });
+                                  setQuantity(Math.abs(item.difference).toString());
+                                  setAdjustmentType(item.difference > 0 ? 'IN' : 'OUT');
+                                  setNote(`Auto-adjusted from Inventory Audit Session #${selectedSessionId}`);
+                                  setReason('Correction');
+                                }}
+                                className={`w-full text-left p-2 rounded transition-all flex justify-between items-center border ${
+                                  selectedAuditItem?.id === item.id 
+                                    ? 'bg-indigo-50 border-indigo-400 shadow-sm' 
+                                    : 'bg-white border-slate-100 hover:border-slate-300'
+                                }`}
+                              >
+                                <div className="space-y-0.5 max-w-[130px]">
+                                  <div className="font-black text-slate-800 italic text-[8.5px] truncate">{item.name}</div>
+                                  <div className="text-[7px] text-slate-400 font-semibold font-mono">[{item.barcode || 'NO_BARCODE'}]</div>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {isAdjusted ? (
+                                    <span className="text-[7px] text-slate-400 font-black tracking-wider uppercase bg-slate-100 px-1 py-0.5 rounded">ADJUSTED</span>
+                                  ) : !hasDiff ? (
+                                    <span className="text-[7px] text-slate-400 font-black tracking-wider bg-slate-100 px-1 py-0.5 rounded">MATCHED</span>
+                                  ) : (
+                                    <span className={`text-[7.5px] font-black px-1.5 py-0.5 rounded border uppercase ${
+                                      item.difference > 0 
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                                        : 'bg-orange-50 text-orange-600 border-orange-200'
+                                    }`}>
+                                      {item.difference > 0 ? '+' : ''}{item.difference}
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
 
-              <div className="space-y-2">
-                 <label className="text-slate-500 font-black tracking-widest text-[8px]">ENTITY_QUERY</label>
-                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
-                    <input 
-                        type="text" 
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="SEARCH_BY_NAME_OR_SCAN..."
-                        className="w-full bg-slate-100 border border-slate-200 text-slate-900 text-[9px] font-black rounded pl-9 pr-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                 </div>
-                 {search && filteredProducts.length > 0 && (
-                  <div className="mt-1 bg-white border border-slate-200 rounded shadow-sm max-h-40 overflow-auto z-50">
-                    {filteredProducts.map(p => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handleProductSelect(p)}
-                        className="w-full p-2 text-left hover:bg-indigo-50 border-b border-slate-100 last:border-0"
-                      >
-                        <div className="font-black text-slate-800 italic">{p.name}</div>
-                        <div className="text-[7px] text-slate-500 font-bold font-mono">[{p.barcode || 'NULL_BARCODE'}]</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {activeTab === 'MANUAL' && (
+                <div className="space-y-2">
+                   <label className="text-slate-500 font-black tracking-widest text-[8px]">ENTITY_QUERY</label>
+                   <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
+                      <input 
+                          type="text" 
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          placeholder="SEARCH_BY_NAME_OR_SCAN..."
+                          className="w-full bg-slate-100 border border-slate-200 text-slate-900 text-[9px] font-black rounded pl-9 pr-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                   </div>
+                   {search && filteredProducts.length > 0 && (
+                    <div className="mt-1 bg-white border border-slate-200 rounded shadow-sm max-h-40 overflow-auto z-50">
+                      {filteredProducts.map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handleProductSelect(p)}
+                          className="w-full p-2 text-left hover:bg-indigo-50 border-b border-slate-100 last:border-0"
+                        >
+                          <div className="font-black text-slate-800 italic">{p.name}</div>
+                          <div className="text-[7px] text-slate-500 font-bold font-mono">[{p.barcode || 'NULL_BARCODE'}]</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-              {selectedProduct && (
+              {activeTab === 'MANUAL' && selectedProduct && (
                 <div className="p-3 bg-indigo-50 border border-indigo-200 rounded animate-in fade-in zoom-in-95">
                    <div className="flex justify-between items-start mb-2">
                        <span className="text-indigo-600 font-black italic">{selectedProduct.barcode}</span>
@@ -276,37 +535,55 @@ export default function StockAdjustment() {
                 </div>
               )}
 
-              <div className="space-y-4">
-                 <label className="text-slate-500 font-black tracking-widest text-[8px]">OP_VECTOR</label>
-                 <div className="grid grid-cols-2 gap-2">
-                     <button 
-                        type="button" 
-                        onClick={() => setAdjustmentType('IN')}
-                        className={`py-2 rounded font-black transition-all border ${adjustmentType === 'IN' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-800'}`}
-                    >
-                        [+] IN
-                    </button>
-                    <button 
-                        type="button" 
-                        onClick={() => setAdjustmentType('OUT')}
-                        className={`py-2 rounded font-black transition-all border ${adjustmentType === 'OUT' ? 'bg-orange-600 border-orange-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-800'}`}
-                    >
-                        [-] OUT
-                    </button>
-                 </div>
-              </div>
+              {activeTab === 'AUDIT' && selectedProduct && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded animate-in fade-in zoom-in-95 space-y-2">
+                   <div className="text-[7px] text-indigo-500 font-black tracking-widest">PROPOSED_CORRECTION_PREVIEW</div>
+                   <div className="text-slate-900 font-black italic tracking-widest truncate">{selectedProduct.name}</div>
+                   <div className="flex justify-between items-center text-[8.5px] font-black mt-1">
+                     <span className="text-slate-500">CORRECTION VECTOR:</span>
+                     <span className={`px-1.5 py-0.5 rounded ${adjustmentType === 'IN' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>
+                       {adjustmentType === 'IN' ? '+' : '-'}{quantity} UNITS
+                     </span>
+                   </div>
+                   <div className="text-[7px] text-slate-400 font-bold font-mono">BARCODE: {selectedProduct.barcode || 'NO_BARCODE'}</div>
+                </div>
+              )}
+
+              {activeTab === 'MANUAL' && (
+                <div className="space-y-4">
+                   <label className="text-slate-500 font-black tracking-widest text-[8px]">OP_VECTOR</label>
+                   <div className="grid grid-cols-2 gap-2">
+                       <button 
+                          type="button" 
+                          onClick={() => setAdjustmentType('IN')}
+                          className={`py-2 rounded font-black transition-all border ${adjustmentType === 'IN' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-800'}`}
+                      >
+                          [+] IN
+                      </button>
+                      <button 
+                          type="button" 
+                          onClick={() => setAdjustmentType('OUT')}
+                          className={`py-2 rounded font-black transition-all border ${adjustmentType === 'OUT' ? 'bg-orange-600 border-orange-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-800'}`}
+                      >
+                          [-] OUT
+                      </button>
+                   </div>
+                </div>
+              )}
 
               <div className="space-y-4">
-                 <div className="space-y-1">
-                    <label className="text-slate-500 font-black tracking-widest text-[8px]">QUANTITY_VEC</label>
-                    <input 
-                        type="number" step="any" required
-                        value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                        placeholder="0.00"
-                        className="w-full bg-slate-100 border border-slate-200 text-slate-900 text-[12px] font-black rounded px-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                 </div>
+                 {activeTab === 'MANUAL' && (
+                    <div className="space-y-1">
+                       <label className="text-slate-500 font-black tracking-widest text-[8px]">QUANTITY_VEC</label>
+                       <input 
+                           type="number" step="any" required
+                           value={quantity}
+                           onChange={(e) => setQuantity(e.target.value)}
+                           placeholder="0.00"
+                           className="w-full bg-slate-100 border border-slate-200 text-slate-900 text-[12px] font-black rounded px-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
+                       />
+                    </div>
+                 )}
                  <div className="space-y-1">
                     <label className="text-slate-500 font-black tracking-widest text-[8px]">REASON_CODE</label>
                     <select 
@@ -334,7 +611,7 @@ export default function StockAdjustment() {
 
               <button 
                 type="submit"
-                disabled={loading || !selectedProduct}
+                disabled={loading}
                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black tracking-widest rounded transition-all active:scale-95 disabled:opacity-30 disabled:grayscale"
               >
                 {loading ? 'EXECUTING_ADJUSTMENT...' : 'SAVE_ADJUSTMENT'}

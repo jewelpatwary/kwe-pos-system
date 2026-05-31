@@ -41,7 +41,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [currency, setCurrencyState] = useState<Currency>(() => {
-    const saved = localStorage.getItem('currencyCode');
+    const saved = localStorage.getItem('currencyCode') || 'MYR';
     return CURRENCIES.find(c => c.code === saved) || CURRENCIES[0];
   });
 
@@ -68,11 +68,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     // Apply font size
     const sizes = {
-      sm: '14px',
-      base: '16px',
+      sm: '10px',
+      base: '14px',
       lg: '18px'
     };
+    const multipliers = {
+      sm: '0.714',
+      base: '1.0',
+      lg: '1.286'
+    };
     root.style.setProperty('--font-size-global', sizes[fontSize]);
+    root.style.setProperty('--font-size-multiplier', multipliers[fontSize]);
+    root.setAttribute('data-font-size', fontSize);
     localStorage.setItem('fontSize', fontSize);
   }, [fontFamily, fontSize]);
 

@@ -5,7 +5,7 @@ import {
   Undo2, LogOut, ShieldAlert, Truck, 
   FileText, CreditCard, Banknote, BarChart3, Database, Cpu, ClipboardCheck,
   ShoppingCart, Receipt, Monitor, Plus, Search, ChevronRight, PackageSearch,
-  Sun, Moon, User, History
+  Sun, Moon, User, History, Coffee, RefreshCcw
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 // No line needed here
@@ -45,8 +45,7 @@ export default function AdminLayout() {
       items: [
         { to: "/admin/products", label: "PRODUCTS", icon: ShoppingBag },
         { to: "/admin/expiry-insights", label: "EXPIRY INSIGHTS", icon: ShieldAlert },
-        { to: "/admin/returns", label: "RETURNS", icon: Undo2 },
-        { to: "/admin/return-history", label: "RET. HISTORY", icon: History },
+        { to: "/admin/return-history", label: "RET. TO SUPPLIER HIS.", icon: History },
         { to: "/admin/labels", label: "LABELS", icon: Printer }
       ]
     },
@@ -64,6 +63,8 @@ export default function AdminLayout() {
       label: "PURCHASES",
       items: [
         { to: "/admin/purchase-invoices", label: "INVOICES", icon: ShoppingCart },
+        { to: "/admin/requisition", label: "REQUISITION", icon: FileText },
+        { to: "/admin/purchase-payments", label: "PAYMENT INV", icon: Banknote },
         { to: "/admin/suppliers", label: "SUPPLIERS", icon: Truck }
       ]
     },
@@ -90,6 +91,8 @@ export default function AdminLayout() {
       label: "SYSTEM",
       items: [
         { to: "/admin/users", label: "STAFF", icon: Users },
+        { to: "/admin/system", label: "SYSTEM RESET", icon: RefreshCcw },
+        { to: "/admin/master-data", label: "MASTER DATA", icon: Database },
         { to: "/admin/settings", label: "SETTINGS", icon: Settings }
       ]
     }
@@ -101,24 +104,7 @@ export default function AdminLayout() {
       <aside 
         className={`bg-white border-r border-slate-200 flex flex-col transition-all duration-300 z-[100] shrink-0 ${collapsed ? 'w-0 opacity-0 invisible' : 'w-64'}`}
       >
-         {/* Sidebar Header: PROFILE & OPTIONS */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50">
-             <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 font-black shrink-0 relative group">
-                        <User className="w-5 h-5" />
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></div>
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-slate-900 font-black truncate text-[11px] leading-tight uppercase">{user?.username || 'GUEST_USER'}</span>
-                      <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{user?.role || 'OPERATOR'}</span>
-                    </div>
-                </div>
-                
-             </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 custom-scrollbar space-y-5">
+         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 custom-scrollbar space-y-5">
             {navGroups.map(group => (
                 <div key={group.id} className="space-y-1">
                      <div className="px-2 py-1 text-[7px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">

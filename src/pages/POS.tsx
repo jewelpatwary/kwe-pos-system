@@ -4,7 +4,8 @@ import { useCartStore, Product } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
 import { 
   Search, ShoppingCart, Trash2, CreditCard, Banknote, ScanBarcode, 
-  Undo2, LogOut, Tag, Ban, Plus, PackageSearch, Star, X, FileText, Settings
+  Undo2, LogOut, Tag, Ban, Plus, PackageSearch, Star, X, FileText, Settings,
+  Wifi, WifiOff, CloudOff
 } from 'lucide-react';
 import CustomerReturnModal from '../components/CustomerReturnModal';
 import OptionsModal from '../components/OptionsModal';
@@ -17,6 +18,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../components/ThemeProvider';
 
 export default function POS() {
+  const { logout, user, token } = useAuthStore();
+  const { currency } = useTheme();
+  const navigate = useNavigate();
+
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart, discount, returnCredit } = useCartStore();
   const [barcodeInput, setBarcodeInput] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -50,10 +55,161 @@ export default function POS() {
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [storeProfile, setStoreProfile] = useState<any>(null);
+  const [posFontSize, setPosFontSize] = useState('12px');
 
-  const { logout, user, token } = useAuthStore();
-  const { currency } = useTheme();
-  const navigate = useNavigate();
+  useEffect(() => {
+    fetch('/api/user/settings/pos_font_size', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success && data.value) setPosFontSize(data.value);
+    })
+    .catch(console.error);
+  }, [token]);
+
+  const savePosFontSize = async (size: string) => {
+    setPosFontSize(size);
+    try {
+      await fetch('/api/user/settings/pos_font_size', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ value: size })
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fontSizeClass = posFontSize === '10px' ? 'text-[10px]' : 
+                        posFontSize === '12px' ? 'text-[12px]' : 
+                        posFontSize === '14px' ? 'text-[14px]' : 'text-[16px]';
+
+  const [onlineStatus, setOnlineStatus] = useState(navigator.onLine);
+  const [syncing, setSyncing] = useState(false);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  const updatePendingSyncCount = () => {
+    try {
+      const q = JSON.parse(localStorage.getItem('pending_offline_sales') || '[]');
+      setPendingSyncCount(q.length);
+    } catch (e) {
+      setPendingSyncCount(0);
+    }
+  };
+
+  const triggerSync = async () => {
+    const qStr = localStorage.getItem('pending_offline_sales');
+    if (!qStr) return;
+    try {
+      const q = JSON.parse(qStr);
+      if (q.length === 0) {
+        setPendingSyncCount(0);
+        return;
+      }
+
+      if (syncing) return;
+      setSyncing(true);
+
+      let syncedCount = 0;
+      const remaining: any[] = [];
+
+      for (const offlineSale of q) {
+        try {
+          const res = await fetch('/api/sales', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(offlineSale.payload)
+          });
+          const data = await res.json();
+          if (data.success) {
+            syncedCount++;
+          } else {
+            remaining.push(offlineSale);
+          }
+        } catch (err) {
+          console.error("Failed to sync transaction", offlineSale.id, err);
+          remaining.push(offlineSale);
+        }
+      }
+
+      localStorage.setItem('pending_offline_sales', JSON.stringify(remaining));
+      setPendingSyncCount(remaining.length);
+      setSyncing(false);
+
+      if (syncedCount > 0) {
+        setErrorMsg(`Successfully synced ${syncedCount} offline transactions!`);
+        setTimeout(() => setErrorMsg(null), 4000);
+        
+        // Refresh product to pull actual server counts
+        try {
+          const [prodRes, catRes, custRes] = await Promise.all([
+            fetch('/api/products'),
+            fetch('/api/categories'),
+            fetch('/api/customers', { headers: { 'Authorization': `Bearer ${token}` } })
+          ]);
+
+          const [prodData, catData, custData] = await Promise.all([
+            prodRes.json(),
+            catRes.json(),
+            custRes.json()
+          ]);
+
+          if (prodData.success) {
+            const salesProds = prodData.data;
+            setProducts(salesProds);
+            localStorage.setItem('cached_products', JSON.stringify(salesProds));
+          }
+          if (catData.success) {
+            setCategories(catData.data);
+            localStorage.setItem('cached_categories', JSON.stringify(catData.data));
+          }
+          if (custData.success) {
+            setCustomers(custData.data);
+            localStorage.setItem('cached_customers', JSON.stringify(custData.data));
+          }
+        } catch (e) {
+          console.error("Refetch tables after sync failed", e);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    updatePendingSyncCount();
+  }, [receiptData]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setOnlineStatus(true);
+      triggerSync();
+    };
+    const handleOffline = () => setOnlineStatus(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const syncInterval = setInterval(() => {
+      if (navigator.onLine) {
+        triggerSync();
+      }
+    }, 12000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(syncInterval);
+    };
+  }, [token]);
 
   useEffect(() => {
     fetch('/api/settings/store', {
@@ -129,6 +285,20 @@ export default function POS() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (receiptData) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setReceiptData(null);
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          window.print();
+          setReceiptData(null);
+          return;
+        }
+      }
+
       if (e.key === 'F4') {
         e.preventDefault();
         setShowCashCalcModal(true);
@@ -152,22 +322,26 @@ export default function POS() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  });
+  }, [receiptData]);
 
   useEffect(() => {
     const focusInterval = setInterval(() => {
       // Don't auto-focus if any modal is open
-      if (showCashCalcModal || showPriceCheck || showCustomerModal || showSummaryModal || showReturnModal || showVoidAuthModal || showVoidSaleModal || receiptData) {
+      if (showCashCalcModal || showPriceCheck || showCustomerModal || showSummaryModal || showReturnModal || showVoidAuthModal || showVoidSaleModal || showOptionsModal || showShortcutsModal || receiptData) {
         return;
       }
       
       const activeElement = document.activeElement;
-      if (activeElement?.id !== 'search-input' && activeElement?.id !== 'price-check-search' && (activeElement?.tagName !== 'INPUT' || activeElement.id === 'barcode-scanner')) {
+      const isInputFocused = activeElement?.tagName === 'INPUT' || 
+                             activeElement?.tagName === 'TEXTAREA' || 
+                             activeElement?.tagName === 'SELECT';
+      
+      if (!isInputFocused || activeElement?.id === 'barcode-scanner') {
         barcodeInputRef.current?.focus();
       }
-    }, 1000);
+    }, 500); // 500ms for more responsive re-focus
     return () => clearInterval(focusInterval);
-  }, [showCashCalcModal, showPriceCheck, showCustomerModal, showSummaryModal, showReturnModal, showVoidAuthModal, showVoidSaleModal, receiptData]);
+  }, [showCashCalcModal, showPriceCheck, showCustomerModal, showSummaryModal, showReturnModal, showVoidAuthModal, showVoidSaleModal, showOptionsModal, showShortcutsModal, receiptData]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -184,11 +358,33 @@ export default function POS() {
           custRes.json()
         ]);
 
-        if (prodData.success) setProducts(prodData.data);
-        if (catData.success) setCategories(catData.data);
-        if (custData.success) setCustomers(custData.data);
+        if (prodData.success) {
+          const salesProds = prodData.data;
+          setProducts(salesProds);
+          localStorage.setItem('cached_products', JSON.stringify(salesProds));
+        }
+        if (catData.success) {
+          setCategories(catData.data);
+          localStorage.setItem('cached_categories', JSON.stringify(catData.data));
+        }
+        if (custData.success) {
+          setCustomers(custData.data);
+          localStorage.setItem('cached_customers', JSON.stringify(custData.data));
+        }
       } catch (err) {
-        console.error(err);
+        console.warn("Offline or network error fetching data, loading from local cache:", err);
+        try {
+          const cachedProds = localStorage.getItem('cached_products');
+          if (cachedProds) setProducts(JSON.parse(cachedProds));
+          
+          const cachedCats = localStorage.getItem('cached_categories');
+          if (cachedCats) setCategories(JSON.parse(cachedCats));
+
+          const cachedCusts = localStorage.getItem('cached_customers');
+          if (cachedCusts) setCustomers(JSON.parse(cachedCusts));
+        } catch (storageErr) {
+          console.error("Failed to parse local stored caches:", storageErr);
+        }
       }
     };
     fetchData();
@@ -203,6 +399,47 @@ export default function POS() {
     setErrorMsg(null);
     setPriceCheckResult(null);
 
+    // 1. Instant Customer RFID or Emp ID lookup
+    const matchedCustomer = customers.find(c => 
+      c.rfid_card === code || 
+      (c.rfid_card && c.rfid_card.toLowerCase() === code.toLowerCase()) ||
+      c.emp_id === code ||
+      c.phone === code
+    );
+
+    if (matchedCustomer) {
+      if (matchedCustomer.credit_status === 'ACTIVE') {
+        setSelectedCustomer(matchedCustomer);
+        setErrorMsg(`Customer Active: ${matchedCustomer.name.toUpperCase()}`);
+        setTimeout(() => setErrorMsg(null), 3000);
+        return;
+      } else {
+        setErrorMsg(`Customer Blocked/Inactive: ${matchedCustomer.name.toUpperCase()}`);
+        setTimeout(() => setErrorMsg(null), 4000);
+        return;
+      }
+    }
+
+    // 2. Instant Local Product lookup
+    const matchedProduct = products.find(p => 
+      p.barcode === code || 
+      (p.barcode && p.barcode.toLowerCase() === code.toLowerCase()) || 
+      p.sku === code || 
+      p.id.toString() === code
+    );
+
+    if (matchedProduct) {
+      if (scanMode === 'PRICE_CHECK') {
+        setPriceCheckResult(matchedProduct);
+      } else {
+        addItem(matchedProduct);
+        setSelectedCartItemId(matchedProduct.id);
+        setIsNewInput(true);
+      }
+      return;
+    }
+
+    // 3. Network fallback if not found locally
     try {
       if (scanMode === 'PRICE_CHECK') {
         const response = await fetch(`/api/products/price-check/${code}`);
@@ -226,7 +463,8 @@ export default function POS() {
         }
       }
     } catch (err) {
-      setErrorMsg('Network error');
+      setErrorMsg('Network error (No local match found)');
+      setTimeout(() => setErrorMsg(null), 3000);
     }
   };
 
@@ -250,53 +488,153 @@ export default function POS() {
     updateQuantity(selectedCartItemId, newQty);
   };
 
-  const handleCompleteSale = async (method: 'CASH' | 'CREDIT' | 'ONLINE', details?: any) => {
+  const handleCompleteSale = async (method: 'CASH' | 'CREDIT' | 'ONLINE' | 'TNG', details?: any) => {
     if (items.length === 0) return;
     if (method === 'CREDIT' && !selectedCustomer) {
       setShowCustomerModal(true);
       return;
     }
 
+    const tempSaleId = `POS-${Date.now()}`;
+    const initialReceipt = {
+      saleId: tempSaleId,
+      items: [...items],
+      total: items.reduce((sum, item) => sum + item.selling_price * item.cart_quantity, 0),
+      discount,
+      returnCredit,
+      method,
+      customer: selectedCustomer,
+      received: details?.receivedAmount,
+      change: details?.changeAmount || 0,
+      date: new Date().toLocaleString(),
+      isPendingSync: true
+    };
+
+    // INSTANTLY display receipt preview to the cashier!
+    setReceiptData(initialReceipt);
+
+    // Capture variables locally before clearing POS cart state
+    const checkoutItems = [...items];
+    const checkoutCustomer = selectedCustomer;
+    const checkoutDiscount = discount;
+    const checkoutReturnCredit = returnCredit;
+
+    // Clear cart immediately so cashier can scan again instantly!
+    clearCart();
+    setSelectedCustomer(null);
+
+    const payload = {
+      items: checkoutItems,
+      payment_method: method,
+      discount_amount: checkoutDiscount + checkoutReturnCredit,
+      customer_id: checkoutCustomer?.id || null,
+      ...details
+    };
+
+    let data: any = null;
+    let isOffline = false;
+
     try {
-      const payload = {
-        items,
-        payment_method: method,
-        discount_amount: discount + returnCredit,
-        customer_id: selectedCustomer?.id || null,
-        ...details
-      };
-      
       const res = await fetch('/api/sales', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      data = await res.json();
+    } catch (err) {
+      console.warn("Sale network fetch failed, falling back to local offline mode.");
+      isOffline = true;
+    }
+
+    if (isOffline) {
+      // Offline transaction flow
+      const offlineSaleId = `OFFLINE-${Date.now()}`;
       
-      if (data.success) {
-        setReceiptData({
-          saleId: data.saleId,
-          items: [...items],
-          total: items.reduce((sum, item) => sum + item.selling_price * item.cart_quantity, 0),
-          discount,
-          returnCredit,
-          method,
-          customer: selectedCustomer,
-          received: details?.receivedAmount,
-          change: details?.changeAmount || 0,
-          date: new Date().toLocaleString()
+      try {
+        const pendingSalesStr = localStorage.getItem('pending_offline_sales') || '[]';
+        const pendingSales = JSON.parse(pendingSalesStr);
+        pendingSales.push({ id: offlineSaleId, payload, timestamp: new Date().toISOString() });
+        localStorage.setItem('pending_offline_sales', JSON.stringify(pendingSales));
+        updatePendingSyncCount();
+      } catch (e) {
+        console.error("Failed to append offline transaction to queue", e);
+      }
+
+      // Simulate stock deduction locally
+      const updatedProducts = products.map(p => {
+        const itemInCart = checkoutItems.find(i => i.id === p.id);
+        if (itemInCart) {
+          return { ...p, stock: Math.max(0, (p.stock || 0) - itemInCart.cart_quantity) };
+        }
+        return p;
+      });
+      setProducts(updatedProducts);
+      localStorage.setItem('cached_products', JSON.stringify(updatedProducts));
+
+      // Simulate customer balance update locally to enforce credit limits
+      if (method === 'CREDIT' && checkoutCustomer) {
+        const updatedCustomers = customers.map(c => {
+          if (c.id === checkoutCustomer.id) {
+            const currentBalance = parseFloat(c.current_balance || '0');
+            const saleTotal = checkoutItems.reduce((sum, item) => sum + item.selling_price * item.cart_quantity, 0) - checkoutDiscount;
+            const newBalance = (currentBalance + saleTotal).toFixed(2);
+            return { ...c, current_balance: newBalance };
+          }
+          return c;
         });
-        clearCart();
-        setSelectedCustomer(null);
-        // Refresh products
+        setCustomers(updatedCustomers);
+        localStorage.setItem('cached_customers', JSON.stringify(updatedCustomers));
+      }
+
+      // Update receipt to offline status
+      setReceiptData((prev: any) => {
+        if (prev && prev.saleId === tempSaleId) {
+          return {
+            ...prev,
+            saleId: offlineSaleId,
+            isOffline: true,
+            isPendingSync: false
+          };
+        }
+        return prev;
+      });
+
+      setErrorMsg("OFFLINE Transaction Saved! It will sync automatically.");
+      setTimeout(() => setErrorMsg(null), 4000);
+      return;
+    }
+
+    if (data && data.success) {
+      // Update receipt with the official sale ID
+      setReceiptData((prev: any) => {
+        if (prev && prev.saleId === tempSaleId) {
+          return {
+            ...prev,
+            saleId: data.sale_id || data.saleId,
+            isPendingSync: false
+          };
+        }
+        return prev;
+      });
+
+      // Refresh products in background
+      try {
         const pRes = await fetch('/api/products');
         const pData = await pRes.json();
-        if (pData.success) setProducts(pData.data);
-      } else {
-        alert(`Error: ${data.message}`);
+        if (pData.success) {
+          const salesProds = pData.data;
+          setProducts(salesProds);
+          localStorage.setItem('cached_products', JSON.stringify(salesProds));
+        }
+      } catch (err) {
+        console.error("Failed to refresh products after successful online checkout", err);
       }
-    } catch (err) {
-      alert("Sale error");
+    } else {
+      setErrorMsg(`Error processing sale: ${data?.message || 'Unknown server error'}`);
+      setTimeout(() => setErrorMsg(null), 5000);
     }
   };
 
@@ -312,10 +650,10 @@ export default function POS() {
   const cashChange = parsedReceived - (getTotal() - discount);
 
   return (
-    <div className="flex bg-slate-50 h-screen overflow-hidden text-slate-800 text-[10px] uppercase transition-colors duration-300">
+    <div className={`flex bg-slate-50 h-screen overflow-hidden text-slate-800 ${fontSizeClass} uppercase transition-colors duration-300`}>
       
-      {/* 1. LEFT: CART AREA (53%) */}
-      <div className="w-[53%] flex flex-col bg-white border-r border-slate-200">
+      {/* 1. LEFT: CART AREA (43%) */}
+      <div className="w-[43%] flex flex-col bg-white border-r border-slate-200">
         <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center shadow-md z-20">
           <div className="flex items-center gap-3">
             <div className="p-1.5 bg-indigo-600 rounded text-white shadow-lg shadow-indigo-500/10">
@@ -327,8 +665,35 @@ export default function POS() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <div className={`px-2 py-1 rounded border flex items-center gap-1 font-bold text-[8px] tracking-widest ${
+              onlineStatus 
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-600' 
+                : 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse'
+            }`} title="Connection Status">
+              {onlineStatus ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+              <span>{onlineStatus ? 'ONLINE' : 'OFFLINE'}</span>
+              {pendingSyncCount > 0 && (
+                <span className="bg-rose-600 text-white font-extrabold px-1 rounded-sm text-[7px]" title="Pending transactions to sync">
+                  {pendingSyncCount} QUEUED
+                </span>
+              )}
+            </div>
+
+            {pendingSyncCount > 0 && onlineStatus && (
+              <button
+                onClick={triggerSync}
+                disabled={syncing}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded cursor-pointer border border-indigo-500 font-bold text-[8px] transition-colors flex items-center gap-1.5"
+              >
+                {syncing ? 'SYNCING...' : 'SYNC NOW'}
+              </button>
+            )}
+
             <button 
-              onClick={() => setShowOptionsModal(true)}
+              onClick={() => {
+                barcodeInputRef.current?.blur();
+                setShowOptionsModal(true);
+              }}
               className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
               title="Options"
             >
@@ -433,7 +798,7 @@ export default function POS() {
              </button>
              <button 
                 disabled={items.length === 0}
-                onClick={() => handleCompleteSale('ONLINE')}
+                onClick={() => handleCompleteSale('TNG')}
                 className="bg-slate-100 border border-slate-200 text-slate-800 py-2 rounded font-black tracking-widest hover:bg-slate-200 shadow-sm transition-all disabled:opacity-20 flex items-center justify-center gap-2"
              >
                 <ShoppingCart className="w-3.5 h-3.5 text-indigo-600" /> TNG
@@ -491,8 +856,8 @@ export default function POS() {
          </div>
       </div>
 
-      {/* 3. RIGHT: PRODUCT PANEL (40%) */}
-      <div className="w-[40%] flex flex-col bg-white transition-colors">
+      {/* 3. RIGHT: PRODUCT PANEL (50%) */}
+      <div className="w-[50%] flex flex-col bg-white transition-colors">
         
         {/* Scanner & Search Header */}
         <div className="p-4 bg-slate-50 border-b border-slate-200 shadow-md space-y-3">
@@ -522,10 +887,10 @@ export default function POS() {
             </form>
           </div>
 
-          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
              <button 
                onClick={() => setSelectedCategory(null)}
-               className={`px-3 py-1 rounded border text-[8px] font-black italic tracking-widest transition-all ${!selectedCategory ? 'bg-indigo-600/20 border-indigo-600 text-slate-900 ' : 'border-slate-200 text-slate-500 hover:text-slate-900 '}`}
+               className={`px-4 py-2 rounded border text-[10px] font-black italic tracking-widest transition-all ${!selectedCategory ? 'bg-indigo-600/20 border-indigo-600 text-slate-900 ' : 'border-slate-200 text-slate-500 hover:text-slate-900 '}`}
              >
                All Categories
              </button>
@@ -533,7 +898,7 @@ export default function POS() {
                <button 
                  key={cat.id}
                  onClick={() => setSelectedCategory(cat.id)}
-                 className={`px-3 py-1 rounded border text-[8px] font-black italic tracking-widest whitespace-nowrap transition-all ${selectedCategory === cat.id ? 'bg-indigo-600/20 border-indigo-600 text-slate-900 ' : 'border-slate-200 text-slate-500 hover:text-slate-900 '}`}
+                 className={`px-4 py-2 rounded border text-[10px] font-black italic tracking-widest whitespace-nowrap transition-all ${selectedCategory === cat.id ? 'bg-indigo-600/20 border-indigo-600 text-slate-900 ' : 'border-slate-200 text-slate-500 hover:text-slate-900 '}`}
                >
                  {cat.name.toUpperCase()}
                </button>
@@ -543,16 +908,30 @@ export default function POS() {
 
         {/* Product Grid Area */}
         <div className="flex-1 overflow-y-auto p-3 custom-scrollbar bg-white">
-          {/* Quick Access Area */}
+          {/* Grid Title Area */}
           <div className="flex items-center gap-2 mb-3">
-             <Star className="w-3 h-3 text-amber-500 fill-amber-500/20" />
-             <h3 className="text-[8px] font-black text-slate-400 italic tracking-[0.3em] uppercase">Popular Items</h3>
+             {(!searchQuery && !selectedCategory) ? <Star className="w-3 h-3 text-amber-500 fill-amber-500/20" /> : <PackageSearch className="w-3 h-3 text-indigo-500" />}
+             <h3 className="text-[11px] font-black text-slate-400 italic tracking-[0.3em] uppercase">
+                {(!searchQuery && !selectedCategory) ? 'Popular Items' : (searchQuery ? `Searching: "${searchQuery}"` : `Category: ${categories.find(c => c.id === selectedCategory)?.name || 'Items'}`)}
+             </h3>
           </div>
           
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
              {products
-               .filter(p => (p.is_favorite || !selectedCategory) && (!searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.includes(searchQuery)))
-               .filter(p => !selectedCategory || p.category_id === selectedCategory)
+               .filter(p => {
+                 const matchesSearch = !searchQuery || 
+                                       p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                       (p.barcode && p.barcode.includes(searchQuery));
+                 const matchesCategory = !selectedCategory || p.category_id === selectedCategory;
+                 
+                 // If searching or category is active, show matches
+                 if (searchQuery || selectedCategory) {
+                   return matchesSearch && matchesCategory;
+                 }
+                 
+                 // If idle view (no search, no category), show only favorites
+                 return matchesSearch && p.is_favorite;
+               })
                .map(p => (
                 <button 
                    key={p.id}
@@ -561,22 +940,22 @@ export default function POS() {
                      setSelectedCartItemId(p.id);
                      setIsNewInput(true);
                    }}
-                   className="flex flex-col bg-slate-50/50 p-2 rounded border border-slate-100 hover:border-indigo-600/50 hover:bg-white transition-all text-left group relative overflow-hidden shadow-sm hover:shadow-md"
+                   className="flex flex-col bg-slate-50/50 p-1.5 rounded border border-slate-100 hover:border-indigo-600/50 hover:bg-white transition-all text-left group relative overflow-hidden shadow-sm hover:shadow-md"
                 >
                   <div className="aspect-square w-full mb-1 bg-slate-200 rounded border border-slate-200 flex items-center justify-center overflow-hidden transition-all opacity-80 group-hover:opacity-100">
                     {p.image_url ? (
                       <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
-                      <div className="p-2 text-center">
-                        <span className="text-[7px] font-black text-slate-600 uppercase tracking-tighter leading-none">{p.name}</span>
+                      <div className="p-1.5 text-center">
+                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-tighter leading-none">{p.name}</span>
                       </div>
                     )}
                   </div>
-                  <div className="font-black text-slate-900 text-[9px] tracking-tight leading-tight italic uppercase block w-full px-0.5 mt-1 truncate">{p.name}</div>
-                  <div className="text-[8px] font-black text-indigo-600 mt-1 italic">{currency.symbol}{p.selling_price.toFixed(2)}</div>
+                  <div className="font-black text-slate-900 text-[11px] tracking-tight leading-tight italic uppercase block w-full px-0.5 mt-1 truncate">{p.name}</div>
+                  <div className="text-[10px] font-black text-indigo-600 mt-1 italic">{currency.symbol}{p.selling_price.toFixed(2)}</div>
                   
-                  <div className="absolute top-1 right-1 w-5 h-5 bg-indigo-600 rounded flex items-center justify-center shadow-lg transform translate-y-8 group-hover:translate-y-0 transition-all opacity-0 group-hover:opacity-100">
-                    <Plus className="w-3 h-3 text-white" />
+                  <div className="absolute top-1 right-1 w-4 h-4 bg-indigo-600 rounded flex items-center justify-center shadow-lg transform translate-y-8 group-hover:translate-y-0 transition-all opacity-0 group-hover:opacity-100">
+                    <Plus className="w-2.5 h-2.5 text-white" />
                   </div>
                 </button>
              ))}
@@ -676,10 +1055,21 @@ export default function POS() {
       {showSummaryModal && <POSSummaryModal onClose={() => setShowSummaryModal(false)} />}
       {showOptionsModal && (
         <OptionsModal 
-          onClose={() => setShowOptionsModal(false)} 
+          onClose={() => {
+            setShowOptionsModal(false);
+            setTimeout(() => barcodeInputRef.current?.focus(), 100);
+          }} 
           onShowSummary={() => { setShowSummaryModal(true); setShowOptionsModal(false); }}
           onShowReturn={() => { setShowReturnModal(true); setShowOptionsModal(false); }}
           onShowShortcuts={() => { setShowShortcutsModal(true); setShowOptionsModal(false); }}
+          onShowPriceCheck={() => {
+            setShowPriceCheck(true);
+            setPriceCheckSearch('');
+            setTimeout(() => document.getElementById('price-check-search')?.focus(), 100);
+            setShowOptionsModal(false);
+          }}
+          posFontSize={posFontSize}
+          onFontSizeChange={savePosFontSize}
         />
       )}
       {showShortcutsModal && <ShortcutsModal onClose={() => setShowShortcutsModal(false)} />}

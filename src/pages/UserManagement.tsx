@@ -196,10 +196,7 @@ export default function UserManagement() {
         )}
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div>IDENTITY_LOG_DB • {users.length} ACTIVE_ENTITIES</div>
-         <div>SYSTEM_WATCHDOG_ONLINE • {new Date().toISOString()}</div>
-      </div>
+
 
       {showForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 bg-[#0f1117]/80 backdrop-blur-sm">

@@ -65,7 +65,7 @@ export default function SalesHistory() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input 
             type="text"
-            placeholder="INVOICE_QUERY (ID/METHOD)..."
+            placeholder="Search Invoice (ID/Method)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded pl-10 pr-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-inner"
@@ -74,7 +74,7 @@ export default function SalesHistory() {
         
         <div className="flex-1"></div>
         <button className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded hover:bg-slate-50 transition flex items-center gap-2 font-black shadow-sm active:scale-95">
-            <Filter className="w-3.5 h-3.5" /> FILTER_LOGS
+            <Filter className="w-3.5 h-3.5" /> Filter Logs
         </button>
       </div>
 
@@ -83,16 +83,16 @@ export default function SalesHistory() {
         <div className="flex-1 overflow-auto border-r border-slate-200 bg-white custom-scrollbar">
             {loading && sales.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
-                    <div className="animate-pulse tracking-[0.5em] font-black text-slate-400 uppercase italic">RECONSTRUCTING_HISTORY_STREAM...</div>
+                    <div className="animate-pulse tracking-[0.5em] font-black text-slate-400 uppercase italic">Loading Sales History...</div>
                 </div>
             ) : (
                 <table className="w-full text-left border-collapse">
                     <thead className="sticky top-0 bg-slate-50 z-20 border-b border-slate-200">
                         <tr className="text-slate-400 bg-slate-50/80 backdrop-blur-md font-black">
-                            <th className="py-4 px-6 border-r border-slate-200">Invoice_ID</th>
-                            <th className="py-4 px-6 border-r border-slate-200">Timestamp</th>
-                            <th className="py-4 px-6 border-r border-slate-200">Payment_Vector</th>
-                            <th className="py-4 px-6 text-right border-r border-slate-200">Total_Val</th>
+                            <th className="py-4 px-6 border-r border-slate-200">Invoice ID</th>
+                            <th className="py-4 px-6 border-r border-slate-200">Date & Time</th>
+                            <th className="py-4 px-6 border-r border-slate-200">Payment Method</th>
+                            <th className="py-4 px-6 text-right border-r border-slate-200">Total Price</th>
                             <th className="py-4 px-6 text-center font-black">Audit</th>
                         </tr>
                     </thead>
@@ -136,9 +136,9 @@ export default function SalesHistory() {
             <div className="p-4 border-b border-slate-200 bg-white flex justify-between items-center transition-colors">
               <div>
                 <h2 className="text-slate-900 font-black italic tracking-tighter uppercase underline decoration-indigo-500 underline-offset-4 decoration-2">
-                   ANALYSIS: INV-x{selectedSale.id.toString().padStart(6, '0')}
+                   Sale Details: INV-x{selectedSale.id.toString().padStart(6, '0')}
                 </h2>
-                <div className="text-[8px] text-slate-400 font-black mt-0.5 tracking-widest">{new Date(selectedSale.created_at).toISOString()}</div>
+                <div className="text-[8px] text-slate-400 font-black mt-0.5 tracking-widest">{new Date(selectedSale.created_at).toLocaleString()}</div>
               </div>
               <div className="flex gap-2">
                   <button className="p-1.5 bg-white border border-slate-200 rounded text-slate-400 hover:text-indigo-600 transition-all shadow-sm active:scale-90">
@@ -153,11 +153,11 @@ export default function SalesHistory() {
             <div className="flex-1 overflow-auto p-6 custom-scrollbar space-y-8 bg-white transition-colors">
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded flex items-center gap-3 shadow-inner">
                    <User className="w-4 h-4 text-indigo-600" />
-                   <span className="text-slate-500 font-black italic tracking-widest text-[9px] uppercase">Walk-In_Entity_0x00</span>
+                   <span className="text-slate-500 font-black italic tracking-widest text-[9px] uppercase">Walk-In Customer</span>
                 </div>
 
                 <div className="space-y-4">
-                    <h3 className="text-[8px] font-black text-slate-400 uppercase tracking-[0.3em] border-b border-slate-200 pb-1 italic">Payload_Contents</h3>
+                    <h3 className="text-[8px] font-black text-slate-400 uppercase tracking-[0.3em] border-b border-slate-200 pb-1 italic">Items List</h3>
                     <div className="space-y-2">
                         {selectedSale.items?.map((item: any, i: number) => (
                             <div key={i} className="bg-slate-50/50 p-3 border border-slate-100 flex justify-between items-center group hover:bg-slate-100 transition-colors">
@@ -173,46 +173,37 @@ export default function SalesHistory() {
 
                 <div className="space-y-3 bg-slate-50 p-4 border-t border-b border-slate-200 font-black transition-colors shadow-inner">
                     <div className="flex justify-between items-center text-slate-400">
-                        <span>SUB_TOTAL</span>
+                        <span>Subtotal</span>
                         <span className="italic">{currency.symbol}{(selectedSale.total_amount + selectedSale.discount_amount).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-red-600">
-                        <span>DISC_ENTRY</span>
+                        <span>Discount</span>
                         <span className="italic">-{currency.symbol}{selectedSale.discount_amount.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-slate-900 text-xl border-t border-slate-200 pt-3 tracking-tighter underline underline-offset-4 decoration-indigo-500 decoration-2">
-                        <span>TOTAL_CREDIT</span>
+                        <span>Total Paid</span>
                         <span className="italic font-sans underline decoration-current">{currency.symbol}{selectedSale.total_amount.toFixed(2)}</span>
                     </div>
                     <div className="mt-4 flex items-center justify-between text-indigo-600 italic tracking-widest text-[8px] pt-2 transition-colors">
                         <div className="flex items-center gap-1.5 underline decoration-indigo-500/30 underline-offset-4">
                             <CreditCard className="w-3 h-3" />
-                            SETTLED : {selectedSale.payment_method === 'ONLINE' ? 'TNG' : selectedSale.payment_method}
+                            Settled : {selectedSale.payment_method === 'ONLINE' ? 'TNG' : selectedSale.payment_method}
                         </div>
-                        <span className="text-slate-300 font-sans tracking-tighter uppercase">VERIFIED_HASH_x190</span>
+                        <span className="text-slate-300 font-sans tracking-tighter uppercase">Verified</span>
                     </div>
                 </div>
             </div>
             
             <div className="p-3 bg-slate-50 border-t border-slate-200 transition-colors">
                 <button onClick={() => setSelectedSale(null)} className="w-full py-3 bg-white border border-slate-200 text-slate-600 font-black tracking-[0.2em] hover:bg-slate-50 hover:text-slate-900 transition shadow-sm text-[9px] uppercase italic active:scale-95">
-                    CLOSE_ANALYSIS
+                    Close
                 </button>
             </div>
           </div>
         )}
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div className="flex items-center gap-2">
-            <FileText className="w-3 h-3 text-indigo-600" />
-            <span>TRANSACTION_RECON • {sales.length} COMPLETED_SETS</span>
-         </div>
-         <div className="flex items-center gap-2 uppercase italic">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500" />
-            <span>SYSTEM_TIME_STAMP : {new Date().toISOString()}</span>
-         </div>
-      </div>
+
     </div>
   );
 }

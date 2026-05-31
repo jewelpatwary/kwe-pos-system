@@ -13,7 +13,7 @@ export function initDB() {
   console.log('Skipping SQLite initDB - logic moved to Supabase');
 }
 
-export async function seedProducts() {
+export async function seedProducts(skipMockData: boolean = false) {
   try {
     // Seed Users
     const { count: userCount, error: uErr } = await supabase.from('users').select('*', { count: 'exact', head: true });
@@ -45,6 +45,15 @@ export async function seedProducts() {
       ]);
     }
 
+    // Check if we already have the database_seeded setting
+    const { data: dbSeededSetting } = await supabase.from('settings').select('value').eq('key', 'database_seeded');
+    const isDbSeededInDb = dbSeededSetting && dbSeededSetting.length > 0 && dbSeededSetting[0].value === 'true';
+
+    if (skipMockData || isDbSeededInDb) {
+      console.log('Skipping mock data seeding (Products, Suppliers, etc.) as skipMockData is true or database_seeded is true in settings.');
+      return;
+    }
+
     // Seed Suppliers
     const { count: supplierCount } = await supabase.from('suppliers').select('*', { count: 'exact', head: true });
     if (supplierCount === 0) {
@@ -60,13 +69,44 @@ export async function seedProducts() {
     if (productCount === 0) {
       console.log('Seeding initial categories and products to Supabase...');
       
-      const { data: categories } = await supabase.from('categories').insert([
-        { name: 'Groceries', status: 'active' },
-        { name: 'Beverages', status: 'active' },
-        { name: 'Snacks', status: 'active' },
-        { name: 'Household', status: 'active' },
-        { name: 'Personal Care', status: 'active' }
-      ]).select();
+      const { data: categoriesSelect, error: selectErr } = await supabase.from('categories').select('*');
+      
+      if (selectErr) {
+        console.error('Supabase categories select error:', {
+          message: selectErr.message,
+          details: selectErr.details,
+          hint: selectErr.hint,
+          code: selectErr.code
+        });
+      }
+
+      let categories = categoriesSelect;
+      
+      if (selectErr) {
+        console.error('Supabase categories select failed, skipping default insertion attempt.');
+      } else if (!categories || categories.length === 0) {
+        console.log('Attempting to insert default categories...');
+        const { data: insertedCats, error: catErr } = await supabase.from('categories').insert([
+          { name: 'Groceries', status: 'active' },
+          { name: 'Beverages', status: 'active' },
+          { name: 'Snacks', status: 'active' },
+          { name: 'Household', status: 'active' },
+          { name: 'Personal Care', status: 'active' }
+        ]).select();
+
+        if (catErr) {
+          console.error('Supabase categories insert error details:', {
+            message: catErr.message,
+            details: catErr.details,
+            hint: catErr.hint,
+            code: catErr.code
+          });
+          // Log keys to see what's in the error object
+          console.error('Supabase categories insert error keys:', Object.keys(catErr));
+          console.error('Supabase categories insert error (raw):', catErr);
+        }
+        categories = insertedCats;
+      }
 
       if (categories && categories.length > 0) {
         const catMap = Object.fromEntries(categories.map(c => [c.name, c.id]));
@@ -93,6 +133,17 @@ export async function seedProducts() {
           { name: 'Herbal Shampoo 250ml', barcode: '909090909090', category_id: catMap['Personal Care'], purchase_price: 4.50, selling_price: 7.80, stock_quantity: 20, supplier_id: supMap['Office Supplies Co'], is_favorite: false }
         ]);
       }
+    }
+    // Set database_seeded as true in the persistent DB to prevent future auto-seeding on cold restarts
+    try {
+      const { data: existing } = await supabase.from('settings').select('*').eq('key', 'database_seeded');
+      if (existing && existing.length > 0) {
+        await supabase.from('settings').update({ value: 'true' }).eq('key', 'database_seeded');
+      } else {
+        await supabase.from('settings').insert([{ key: 'database_seeded', value: 'true' }]);
+      }
+    } catch (setErr: any) {
+      console.error('Failed to set database_seeded in settings table:', setErr.message);
     }
   } catch (err: any) {
     console.error('Supabase seeding error:', err.message);

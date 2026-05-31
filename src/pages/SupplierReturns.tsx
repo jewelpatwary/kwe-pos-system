@@ -360,17 +360,17 @@ export default function SupplierReturns() {
                       
                       <div className="grid grid-cols-12 gap-4 items-center bg-slate-50 p-3 border border-slate-200 rounded shadow-inner">
                         <div className="col-span-12 md:col-span-5 space-y-1">
-                          <label className="text-[7px] text-slate-400 font-black tracking-widest uppercase italic">RDR_REASON_LOG</label>
+                          <label className="text-[7px] text-slate-400 font-black tracking-widest uppercase italic">Reason</label>
                           <input 
                             type="text"
-                            placeholder="FAULT_DESCRIPTION..."
+                            placeholder="Enter details..."
                             value={item.return_reason}
                             onChange={e => updateReason(item.id, e.target.value)}
                             className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 uppercase shadow-sm"
                           />
                         </div>
                         <div className="col-span-6 md:col-span-4 space-y-1">
-                          <label className="text-[7px] text-slate-400 font-black tracking-widest uppercase italic">QUANTITY_VEC</label>
+                          <label className="text-[7px] text-slate-400 font-black tracking-widest uppercase italic">Quantity</label>
                           <div className="flex items-center gap-1.5">
                             <button 
                               onClick={() => updateQuantity(item.id, item.return_quantity - 1, item.stock_quantity)}
@@ -398,7 +398,7 @@ export default function SupplierReturns() {
                      <textarea 
                        rows={2} 
                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-[10px] font-black rounded p-3 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none italic shadow-inner uppercase tracking-widest transition-colors"
-                       placeholder="METADATA_EXTERN_NOTES..."
+                       placeholder="Internal notes..."
                        value={returnNotes}
                        onChange={e => setReturnNotes(e.target.value)}
                      />
@@ -409,7 +409,7 @@ export default function SupplierReturns() {
               {/* ACTION_FOOTER */}
               <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center shadow-2xl transition-colors">
                 <div>
-                   <div className="text-[8px] text-slate-400 font-black tracking-[0.2em] uppercase italic">CUMULATIVE_REVERSAL_VAL</div>
+                   <div className="text-[8px] text-slate-400 font-black tracking-[0.2em] uppercase italic">Total Refund Value</div>
                    <div className="text-3xl font-black text-slate-900 italic tracking-tighter transition-colors underline decoration-indigo-500 decoration-4 underline-offset-8 font-sans transition-all">{currency.symbol}{totalReturnValue.toFixed(2)}</div>
                 </div>
                 <button 
@@ -417,7 +417,7 @@ export default function SupplierReturns() {
                   disabled={returnItems.length === 0}
                   className="bg-indigo-600 text-white px-10 py-4 rounded font-black tracking-[0.2em] hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-30 disabled:grayscale flex items-center gap-3 shadow-xl shadow-indigo-500/20 uppercase"
                 >
-                  <Save className="w-5 h-5" /> SAVE_RETURN
+                  <Save className="w-5 h-5" /> Save Return to supplier
                 </button>
               </div>
             </div>
@@ -429,7 +429,7 @@ export default function SupplierReturns() {
             <div className="w-20 h-20 bg-emerald-50 border border-emerald-500/30 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg shadow-emerald-500/10">
               <Undo2 className="w-10 h-10" />
             </div>
-            <h2 className="text-3xl font-black text-slate-900 italic tracking-tighter mb-3 uppercase transition-colors underline decoration-indigo-500 underline-offset-8 decoration-4">REVERSAL_SUCCESSFUL</h2>
+            <h2 className="text-3xl font-black text-slate-900 italic tracking-tighter mb-3 uppercase transition-colors underline decoration-indigo-500 underline-offset-8 decoration-4">Return to supplier Successful</h2>
             <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest mb-10 italic leading-relaxed">Stock registers updated. Debit memos logged to vendor accounts. Financial discrepancy resolved.</p>
             
             <div className="flex gap-4 justify-center">
@@ -437,29 +437,20 @@ export default function SupplierReturns() {
                 onClick={handlePrintSlip}
                 className="bg-white border border-slate-200 text-slate-600 hover:text-slate-900 px-8 py-4 rounded font-black tracking-widest flex items-center gap-3 transition-all shadow-md active:scale-95 uppercase"
               >
-                <Printer className="w-4 h-4" /> GENERATE_M_SLIP
+                <Printer className="w-4 h-4" /> Print Receipt
               </button>
               <button 
                 onClick={() => setIsSubmitSuccess(false)}
                 className="bg-indigo-600 text-white hover:bg-indigo-700 px-8 py-4 rounded font-black tracking-widest flex items-center gap-3 transition-all shadow-xl shadow-indigo-500/20 active:scale-95 uppercase"
               >
-                <Plus className="w-4 h-4" /> RE_INIT_STREAM
+                <Plus className="w-4 h-4" /> New Return
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div className="flex items-center gap-2">
-            <Undo2 className="w-3 h-3 text-indigo-600" />
-            <span>PROC_REVERSAL_MODULE • SECTOR_09 • BUFFER_ACTIVE_BITS</span>
-         </div>
-         <div className="flex items-center gap-2 uppercase italic">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500" />
-            <span>SYSTEM_TIME_SYNC : {new Date().toISOString()}</span>
-         </div>
-      </div>
+
 
       {/* --- HIDDEN PRINT AREA --- */}
       {recentReturnData && (

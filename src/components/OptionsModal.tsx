@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, LogOut, Keyboard, Undo2, BarChart3, Settings } from 'lucide-react';
+import { X, LogOut, Keyboard, Undo2, BarChart3, Settings, Tag } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuthStore } from '../store/authStore';
 
@@ -9,11 +9,14 @@ interface OptionsModalProps {
   onShowSummary: () => void;
   onShowReturn: () => void;
   onShowShortcuts: () => void;
+  onShowPriceCheck: () => void;
+  posFontSize: string;
+  onFontSizeChange: (size: string) => void;
 }
 
-export default function OptionsModal({ onClose, onShowSummary, onShowReturn, onShowShortcuts }: OptionsModalProps) {
+export default function OptionsModal({ onClose, onShowSummary, onShowReturn, onShowShortcuts, onShowPriceCheck, posFontSize, onFontSizeChange }: OptionsModalProps) {
   const navigate = useNavigate();
-  const { logout } = useAuthStore();
+  const { logout, user } = useAuthStore();
 
   const handleLogout = () => {
     logout();
@@ -22,10 +25,14 @@ export default function OptionsModal({ onClose, onShowSummary, onShowReturn, onS
 
   const options = [
     { label: 'DAILY SALES SUMMARY', icon: BarChart3, action: () => { onShowSummary(); onClose(); } },
+    { label: 'PRODUCT / PRICE CHECK (F9)', icon: Tag, action: () => { onShowPriceCheck(); onClose(); } },
+    { label: 'MASTER DATA', icon: Settings, action: () => { navigate('/admin/master-data'); onClose(); }, role: ['ADMIN', 'MANAGER'] },
     { label: 'SALES RETURN', icon: Undo2, action: () => { onShowReturn(); onClose(); } },
     { label: 'SHORTCUT KEYS', icon: Keyboard, action: () => { onShowShortcuts(); onClose(); } },
     { label: 'LOGOUT', icon: LogOut, action: handleLogout, danger: true }
   ];
+
+  const visibleOptions = options.filter(opt => !opt.role || opt.role.includes(user?.role || ''));
 
   return (
     <AnimatePresence>
@@ -50,7 +57,7 @@ export default function OptionsModal({ onClose, onShowSummary, onShowReturn, onS
             </div>
 
             <div className="space-y-2">
-                {options.map((opt, i) => (
+                {visibleOptions.map((opt, i) => (
                     <button 
                         key={i}
                         onClick={opt.action}
@@ -62,6 +69,20 @@ export default function OptionsModal({ onClose, onShowSummary, onShowReturn, onS
                         {opt.label}
                     </button>
                 ))}
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 text-[10px]">
+               <label className="font-black text-slate-400 uppercase tracking-widest block mb-2">POS UI FONT SIZE</label>
+               <select 
+                  value={posFontSize}
+                  onChange={(e) => onFontSizeChange(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 p-2 rounded font-black uppercase"
+               >
+                  <option value="10px">SMALL [10PX]</option>
+                  <option value="12px">OPTIMAL [12PX]</option>
+                  <option value="14px">LARGE [14PX]</option>
+                  <option value="16px">EXTRA LARGE [16PX]</option>
+               </select>
             </div>
         </motion.div>
       </div>

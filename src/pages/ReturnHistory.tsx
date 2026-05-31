@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Undo2, Trash2, Edit3, CheckCircle, Clock, History } from 'lucide-react';
+import { Undo2, Trash2, Edit3, CheckCircle, Clock, History, PlusCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import ConfirmModal from '../components/ConfirmModal';
@@ -88,10 +88,13 @@ export default function ReturnHistory() {
   return (
     <div className="p-0 h-full flex flex-col bg-white text-slate-800 font-sans text-[10px] uppercase transition-colors duration-300">
       <div className="bg-slate-50 border-b border-slate-200 p-3 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-3">
-            <Undo2 className="w-4 h-4 text-indigo-600" />
-            <span className="font-black tracking-widest">SUPPLIER_RETURN_HISTORY</span>
-        </div>
+        <button 
+          onClick={() => navigate('/admin/returns')} 
+          className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded font-black tracking-wider transition-all shadow-md shadow-indigo-500/10 hover:shadow-indigo-500/20 active:scale-95"
+        >
+          <PlusCircle className="w-4 h-4" />
+          CREATE_RETURN_INVOICE
+        </button>
         <button onClick={() => navigate('/admin/deleted-return-history')} className="flex items-center gap-2 bg-slate-200 px-3 py-1 rounded font-bold">
           <History className="w-3 h-3" />
           VIEW_DELETED_LOGS

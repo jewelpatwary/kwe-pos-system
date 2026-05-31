@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import Papa from 'papaparse';
 import { 
   ShoppingBag, Plus, Edit2, Trash2, Search, Filter, 
-  AlertTriangle, UploadCloud, Download, History, X, CheckCircle2, ArrowLeft
+  AlertTriangle, UploadCloud, Download, History, X, CheckCircle2, ArrowLeft,
+  ArrowUpDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -13,6 +15,7 @@ export default function ProductManagement() {
   const [products, setProducts] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [categories2, setCategories2] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [search, setSearch] = useState('');
@@ -21,11 +24,15 @@ export default function ProductManagement() {
   const [loading, setLoading] = useState(false);
   const [productToDelete, setProductToDelete] = useState<{id: number, name: string} | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory2, setSelectedCategory2] = useState('all');
+  const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'modified_desc' | 'modified_asc'>('modified_desc');
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const [formData, setFormData] = useState({
-    id: '', name: '', barcode: '', category_id: '', brand_id: '', unit_id: '',
+    id: '', name: '', barcode: '', category_id: '', category2_id: '', brand_id: '', unit_id: '',
     purchase_price: '', selling_price: '', stock_quantity: '', supplier_id: '',
     image_url: '',
     is_credit_allowed: true, expiry_enabled: false, is_favorite: false,
+    status: 'active',
     expiry_date: ''
   });
   const [selectedProductDetails, setSelectedProductDetails] = useState<any>(null);
@@ -56,21 +63,23 @@ export default function ProductManagement() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [prodRes, supRes, catRes, brandRes, unitRes] = await Promise.all([
+      const [prodRes, supRes, catRes, cat2Res, brandRes, unitRes] = await Promise.all([
         fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/suppliers', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/categories', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/categories2', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/brands', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/units', { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
-      const [prodData, supData, catData, brandData, unitData] = await Promise.all([
-        prodRes.json(), supRes.json(), catRes.json(), brandRes.json(), unitRes.json()
+      const [prodData, supData, catData, cat2Data, brandData, unitData] = await Promise.all([
+        prodRes.json(), supRes.json(), catRes.json(), cat2Res.json(), brandRes.json(), unitRes.json()
       ]);
 
       if (prodData.success) setProducts(prodData.data);
       if (supData.success) setSuppliers(supData.data);
       if (catData.success) setCategories(catData.data);
+      if (cat2Data.success) setCategories2(cat2Data.data);
       if (brandData.success) setBrands(brandData.data);
       if (unitData.success) setUnits(unitData.data);
     } catch (err) {
@@ -82,7 +91,25 @@ export default function ProductManagement() {
 
   useEffect(() => {
     fetchData();
+    const draft = localStorage.getItem('product_draft');
+    if (draft) {
+      try {
+        setFormData(JSON.parse(draft));
+      } catch (e) {
+        console.error('Failed to parse product draft', e);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('product_draft', JSON.stringify(formData));
+  }, [formData]);
+
+  useEffect(() => {
+    if (!token) {
+      localStorage.removeItem('product_draft');
+    }
+  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,16 +131,28 @@ export default function ProductManagement() {
           stock_quantity: Number(formData.stock_quantity),
           supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
           category_id: formData.category_id ? Number(formData.category_id) : null,
+          category2_id: formData.category2_id ? Number(formData.category2_id) : null,
           brand_id: formData.brand_id ? Number(formData.brand_id) : null,
           unit_id: formData.unit_id ? Number(formData.unit_id) : null,
-          is_credit_allowed: formData.is_credit_allowed ? 1 : 0,
+          is_credit_allowed: !!formData.is_credit_allowed,
           expiry_enabled: formData.expiry_enabled ? 1 : 0,
+          is_favorite: !!formData.is_favorite,
+          status: formData.status,
           expiry_date: formData.expiry_date || null
         })
       });
 
       const data = await res.json();
       if (data.success) {
+        localStorage.removeItem('product_draft');
+        setFormData({
+            id: '', name: '', barcode: '', category_id: '', category2_id: '', brand_id: '', unit_id: '',
+            purchase_price: '', selling_price: '', stock_quantity: '', supplier_id: '',
+            image_url: '',
+            is_credit_allowed: true, expiry_enabled: false, is_favorite: false,
+            status: 'active',
+            expiry_date: ''
+        });
         setShowForm(false);
         resetForm();
         fetchData();
@@ -137,7 +176,7 @@ export default function ProductManagement() {
     try {
       const res = await fetch(`/api/products/${productToDelete.id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': 'Bearer ' + token }
       });
       const data = await res.json();
       if (data.success) fetchData();
@@ -155,6 +194,7 @@ export default function ProductManagement() {
       name: prod.name,
       barcode: prod.barcode,
       category_id: prod.category_id ? prod.category_id.toString() : '',
+      category2_id: prod.category2_id ? prod.category2_id.toString() : '',
       brand_id: prod.brand_id ? prod.brand_id.toString() : '',
       unit_id: prod.unit_id ? prod.unit_id.toString() : '',
       purchase_price: prod.purchase_price.toString(),
@@ -165,6 +205,7 @@ export default function ProductManagement() {
       is_credit_allowed: Boolean(prod.is_credit_allowed),
       expiry_enabled: Boolean(prod.expiry_enabled),
       is_favorite: Boolean(prod.is_favorite),
+      status: prod.status || 'active',
       expiry_date: prod.expiry_date || ''
     });
     setIsEditing(true);
@@ -173,10 +214,11 @@ export default function ProductManagement() {
 
   const resetForm = () => {
     setFormData({
-      id: '', name: '', barcode: '', category_id: '', brand_id: '', unit_id: '',
+      id: '', name: '', barcode: '', category_id: '', category2_id: '', brand_id: '', unit_id: '',
       purchase_price: '', selling_price: '', stock_quantity: '', supplier_id: '',
       image_url: '',
       is_credit_allowed: true, expiry_enabled: false, is_favorite: false,
+      status: 'active',
       expiry_date: ''
     });
   };
@@ -185,24 +227,123 @@ export default function ProductManagement() {
     if (!importFile) return alert('Select a file first');
     setImportLoading(true);
     setImportStatus('Analyzing CSV structure and validating data...');
-    
-    // Simulate import
-    setTimeout(() => {
-      setImportLoading(false);
-      setImportStatus('Success! Bulk import completed. 520 products updated.');
-      setImportFile(null);
-      fetchData(); // Refresh list to simulate data update
-    }, 2500);
+
+    Papa.parse(importFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const rows = results.data as any[];
+        const processedRows = [];
+        let errors = 0;
+
+        for (const row of rows) {
+          try {
+            if (!row.Name || !row.Barcode) continue; // Skip strictly invalid rows
+
+            // Find IDs from names
+            const category = categories.find(c => c.name.toLowerCase() === (row.Category || '').trim().toLowerCase());
+            const category2 = categories2.find(c => c.name.toLowerCase() === (row.Category2 || '').trim().toLowerCase());
+            const brand = brands.find(b => b.name.toLowerCase() === (row.Brand || '').trim().toLowerCase());
+            const unit = units.find(u => u.name.toLowerCase() === (row.Unit || '').trim().toLowerCase());
+            const supplier = suppliers.find(s => s.name.toLowerCase() === (row.Supplier || '').trim().toLowerCase());
+
+            const purchasePrice = parseFloat(row.PurchasePrice) || 0;
+            const sellingPrice = parseFloat(row.SellingPrice) || 0;
+            const stockQty = Math.floor(parseFloat(row.StockQuantity) || 0);
+
+            processedRows.push({
+              name: (row.Name || '').trim(),
+              barcode: (row.Barcode || '').trim(),
+              category_id: category?.id ? Number(category.id) : null,
+              category2_id: category2?.id ? Number(category2.id) : null,
+              brand_id: brand?.id ? Number(brand.id) : null,
+              unit_id: unit?.id ? Number(unit.id) : null,
+              supplier_id: supplier?.id ? Number(supplier.id) : null,
+              purchase_price: purchasePrice,
+              selling_price: sellingPrice,
+              stock_quantity: stockQty,
+              expiry_enabled: !!row.ExpiryDate,
+              expiry_date: row.ExpiryDate || null,
+              status: 'active',
+              is_credit_allowed: true,
+              is_favorite: false
+            });
+          } catch (e) {
+            errors++;
+          }
+        }
+
+        if (processedRows.length === 0) {
+          setImportLoading(false);
+          setImportStatus('Error: No valid data found in CSV.');
+          return;
+        }
+
+        try {
+          setImportStatus(`Syncing ${processedRows.length} products to database...`);
+          const res = await fetch('/api/admin/products/bulk', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ products: processedRows })
+          });
+          const data = await res.json();
+          if (data.success) {
+            setImportStatus(`Success! Bulk import completed. ${processedRows.length} products processed.`);
+            setImportFile(null);
+            fetchData();
+          } else {
+            setImportStatus('Error: ' + data.message);
+          }
+        } catch (err) {
+          setImportStatus('Error connecting to server for bulk import.');
+        } finally {
+          setImportLoading(false);
+        }
+      },
+      error: (err) => {
+        setImportLoading(false);
+        setImportStatus('Error parsing CSV: ' + err.message);
+      }
+    });
   };
 
-  // Filter products
+  // Filter and sort products
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
-                         p.barcode.includes(search) ||
+    const matchesSearch = !search || 
+                         (p.name && p.name.toLowerCase().includes(search.toLowerCase())) || 
+                         (p.barcode && p.barcode.toLowerCase().includes(search.toLowerCase())) ||
                          (p.category_name && p.category_name.toLowerCase().includes(search.toLowerCase())) ||
                          (p.brand_name && p.brand_name.toLowerCase().includes(search.toLowerCase()));
     const matchesCategory = selectedCategory === 'all' || p.category_id?.toString() === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesCategory2 = selectedCategory2 === 'all' || p.category2_id?.toString() === selectedCategory2;
+    const matchesStatus = selectedStatus === 'all' || p.status === selectedStatus;
+    return matchesSearch && matchesCategory && matchesCategory2 && matchesStatus;
+  }).sort((a, b) => {
+    if (sortBy === 'name_asc') {
+      return (a.name || '').localeCompare(b.name || '');
+    } else if (sortBy === 'name_desc') {
+      return (b.name || '').localeCompare(a.name || '');
+    } else if (sortBy === 'modified_desc') {
+      const getVal = (item: any) => {
+        const d = item.updated_at || item.created_at;
+        if (!d) return Number(item.id || 0);
+        const parsed = Date.parse(d);
+        return isNaN(parsed) ? Number(item.id || 0) : parsed;
+      };
+      return getVal(b) - getVal(a);
+    } else if (sortBy === 'modified_asc') {
+      const getVal = (item: any) => {
+        const d = item.updated_at || item.created_at;
+        if (!d) return Number(item.id || 0);
+        const parsed = Date.parse(d);
+        return isNaN(parsed) ? Number(item.id || 0) : parsed;
+      };
+      return getVal(a) - getVal(b);
+    }
+    return 0;
   });
 
   if (showForm) {
@@ -229,67 +370,71 @@ export default function ProductManagement() {
         <div className="flex-1 overflow-auto p-12 bg-slate-100">
             <div className="max-w-4xl mx-auto bg-white border border-slate-200 rounded p-8 shadow-2xl relative animate-in fade-in slide-in-from-bottom-4">
                 <form id="productEntryForm" onSubmit={handleSubmit} className="space-y-8">
+                    {/* Seq 1 & 2: Product Name & Barcode */}
                     <div className="grid grid-cols-2 gap-8">
-                         <div className="space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-slate-400 font-black tracking-widest">Product Name</label>
-                                <input 
-                                    type="text" required 
-                                    value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} 
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-black italic text-lg shadow-sm"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-slate-400 font-black tracking-widest">Barcode</label>
-                                <input 
-                                    type="text" required 
-                                    value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} 
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-lg shadow-sm"
-                                />
-                            </div>
-                         </div>
-                         <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-slate-400 font-black tracking-widest">Category</label>
-                                    <select 
-                                        required value={formData.category_id} 
-                                        onChange={e => setFormData({...formData, category_id: e.target.value})} 
-                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm"
-                                    >
-                                        <option value="">NULL_VEC</option>
-                                        {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-slate-400 font-black tracking-widest">Unit</label>
-                                    <select 
-                                        required value={formData.unit_id} 
-                                        onChange={e => setFormData({...formData, unit_id: e.target.value})} 
-                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm"
-                                    >
-                                        <option value="">NULL_VEC</option>
-                                        {units.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-slate-400 font-black tracking-widest">Brand</label>
-                                <select 
-                                    value={formData.brand_id} 
-                                    onChange={e => setFormData({...formData, brand_id: e.target.value})} 
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm"
-                                >
-                                    <option value="">GENERIC_VEC</option>
-                                    {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-                                </select>
-                            </div>
-                         </div>
+                        <div className="space-y-1">
+                            <label className="text-slate-400 font-black tracking-widest">Product Name</label>
+                            <input 
+                                type="text" required 
+                                value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} 
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-black italic text-lg shadow-sm"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-slate-400 font-black tracking-widest">Barcode</label>
+                            <input 
+                                type="text" required 
+                                value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} 
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-lg shadow-sm"
+                            />
+                        </div>
                     </div>
 
+                    {/* Seq 3 & 7: Category & Category 2 */}
+                    <div className="grid grid-cols-2 gap-8">
+                        <div className="space-y-1">
+                            <label className="text-slate-400 font-black tracking-widest">Category</label>
+                            <select 
+                                required value={formData.category_id} 
+                                onChange={e => {
+                                    const selectedId = e.target.value;
+                                    setFormData({...formData, category_id: selectedId});
+                                }} 
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm h-[46px]"
+                            >
+                                <option value="">Select Category</option>
+                                {categories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-slate-400 font-black tracking-widest">Category 2</label>
+                            <select 
+                                value={formData.category2_id} 
+                                onChange={e => {
+                                    const selectedId = e.target.value;
+                                    setFormData({...formData, category2_id: selectedId});
+                                }} 
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm h-[46px]"
+                            >
+                                <option value="">Select Category 2</option>
+                                {categories2.map(cat => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Seq 5, 6 & 7: Buying Price, Seals Price & Stock */}
                     <div className="grid grid-cols-3 gap-8 p-6 bg-slate-50 border border-slate-200 rounded">
                         <div className="space-y-1">
-                            <label className="text-slate-400 font-black tracking-widest">Purchase Price</label>
+                            <label className="text-slate-400 font-black tracking-widest">Buying Price</label>
                             <input 
                                 type="number" step="0.01" required 
                                 value={formData.purchase_price} onChange={e => setFormData({...formData, purchase_price: e.target.value})} 
@@ -297,7 +442,7 @@ export default function ProductManagement() {
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-indigo-600 font-black tracking-widest italic">Selling Price</label>
+                            <label className="text-indigo-600 font-black tracking-widest italic">Seals Price</label>
                             <input 
                                 type="number" step="0.01" required 
                                 value={formData.selling_price} onChange={e => setFormData({...formData, selling_price: e.target.value})} 
@@ -314,28 +459,71 @@ export default function ProductManagement() {
                         </div>
                     </div>
 
-                     <div className="grid grid-cols-4 gap-8">
-                          <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded hover:border-indigo-300 transition-all cursor-pointer group shadow-sm">
-                              <input type="checkbox" id="fav" checked={formData.is_favorite} onChange={e => setFormData({...formData, is_favorite: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                              <label htmlFor="fav" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900">Featured</label>
-                          </div>
-                          <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded hover:border-indigo-300 transition-all cursor-pointer group shadow-sm">
-                              <input type="checkbox" id="credit" checked={formData.is_credit_allowed} onChange={e => setFormData({...formData, is_credit_allowed: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                              <label htmlFor="credit" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900">Allow Credit</label>
-                          </div>
-                          <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded hover:border-indigo-300 transition-all cursor-pointer group shadow-sm">
-                              <input type="checkbox" id="expiry" checked={formData.expiry_enabled} onChange={e => setFormData({...formData, expiry_enabled: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                              <label htmlFor="expiry" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900">Track Expiry</label>
-                          </div>
-                          <div className="space-y-1">
-                                <label className="text-slate-400 font-black tracking-widest">Expiry Date</label>
-                                <input 
-                                    type="date" 
-                                    value={formData.expiry_date} onChange={e => setFormData({...formData, expiry_date: e.target.value})} 
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-3 py-2 rounded outline-none shadow-sm text-[9px] font-black"
-                                />
-                          </div>
-                     </div>
+                    {/* Seq 8: Expiry Details */}
+                    <div className="grid grid-cols-2 gap-8">
+                        <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded hover:border-indigo-300 transition-all cursor-pointer group shadow-sm">
+                            <input type="checkbox" id="expiry" checked={formData.expiry_enabled} onChange={e => setFormData({...formData, expiry_enabled: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
+                            <label htmlFor="expiry" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900">Track Expiry</label>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-slate-400 font-black tracking-widest">Expiry Date</label>
+                            <input 
+                                type="date" 
+                                value={formData.expiry_date} onChange={e => setFormData({...formData, expiry_date: e.target.value})} 
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm text-[9px] font-black h-[46px]"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Metadata descriptors */}
+                    <div className="grid grid-cols-2 gap-8 pt-4 border-t border-slate-200">
+                        <div className="space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-slate-400 font-black tracking-widest">Unit</label>
+                                <select 
+                                    required value={formData.unit_id} 
+                                    onChange={e => setFormData({...formData, unit_id: e.target.value})} 
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm"
+                                >
+                                    <option value="">Select Unit</option>
+                                    {units.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-slate-400 font-black tracking-widest">Brand</label>
+                                <select 
+                                    value={formData.brand_id} 
+                                    onChange={e => setFormData({...formData, brand_id: e.target.value})} 
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm"
+                                >
+                                    <option value="">Generic Brand</option>
+                                    {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col justify-center gap-4">
+                            <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded hover:border-indigo-300 transition-all cursor-pointer group shadow-sm">
+                                <input type="checkbox" id="fav" checked={formData.is_favorite} onChange={e => setFormData({...formData, is_favorite: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
+                                <label htmlFor="fav" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900">Featured</label>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-slate-400 font-black tracking-widest">Status</label>
+                                <select 
+                                    value={formData.status} 
+                                    onChange={e => setFormData({...formData, status: e.target.value})} 
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm"
+                                >
+                                    <option value="active">Active</option>
+                                    <option value="deactive">Deactive</option>
+                                </select>
+                             </div>
+                            <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded hover:border-indigo-300 transition-all cursor-pointer group shadow-sm">
+                                <input type="checkbox" id="credit" checked={formData.is_credit_allowed} onChange={e => setFormData({...formData, is_credit_allowed: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
+                                <label htmlFor="credit" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900">Allow Credit</label>
+                            </div>
+                        </div>
+                    </div>
 
                     <div className="pt-8 flex justify-end">
                          <button 
@@ -354,7 +542,11 @@ export default function ProductManagement() {
     <div className="p-0 h-full flex flex-col bg-white text-slate-800 font-sans text-[10px] uppercase transition-colors duration-300">
       {/* Sub-Header / Filters */}
       <div className="bg-slate-50 border-b border-slate-200 p-3 flex flex-wrap items-center gap-3 sticky top-0 z-20 shadow-md">
-        <div className="relative flex-1 max-w-sm">
+        <div className="bg-white border-l-4 border-indigo-500 px-3 py-1 mr-2 hidden sm:block shadow-sm">
+           <div className="text-[8px] text-slate-400 font-bold uppercase overflow-hidden leading-tight">Database</div>
+           <div className="text-[11px] text-slate-900 font-black leading-tight">{filteredProducts.length} FOUND</div>
+        </div>
+        <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input 
             type="text"
@@ -364,14 +556,50 @@ export default function ProductManagement() {
             className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded pl-10 pr-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
           />
         </div>
+
+        <select 
+          value={selectedCategory} 
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="bg-white border border-slate-200 text-slate-750 text-[9px] font-black rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm h-[33px]"
+        >
+          <option value="all">All Categories</option>
+          {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+        </select>
+
+        <select 
+          value={selectedCategory2} 
+          onChange={(e) => setSelectedCategory2(e.target.value)}
+          className="bg-white border border-slate-200 text-slate-755 text-[9px] font-black rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm h-[33px]"
+        >
+          <option value="all">All Categories 2</option>
+          {categories2.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+        </select>
+
+        <select 
+          value={selectedStatus} 
+          onChange={(e) => setSelectedStatus(e.target.value)}
+          className="bg-white border border-slate-200 text-slate-755 text-[9px] font-black rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm h-[33px]"
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active Only</option>
+          <option value="deactive">Deactive Only</option>
+        </select>
+
+        <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded px-2.5 shadow-sm h-[33px]">
+          <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+          <select 
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="bg-transparent border-none text-slate-900 text-[9px] font-black outline-none cursor-pointer py-1.5 pr-2 focus:ring-0"
+          >
+            <option value="name_asc">A-Z</option>
+            <option value="name_desc">Z-A</option>
+            <option value="modified_desc">Last modified (Top)</option>
+            <option value="modified_asc">Last modified (Last)</option>
+          </select>
+        </div>
         
         <div className="flex items-center gap-2">
-            <button 
-                onClick={() => navigate('/admin/expiry-insights')}
-                className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded hover:bg-red-100 transition flex items-center gap-2 shadow-sm uppercase font-black"
-            >
-                <AlertTriangle className="w-3.5 h-3.5" /> EXPIRY_INSIGHTS_PROTOCOL
-            </button>
             <button 
                 onClick={() => setShowImportModal(true)}
                 className="bg-slate-100 border border-slate-200 text-slate-600 px-3 py-2 rounded hover:bg-slate-200 transition flex items-center gap-2 shadow-sm"
@@ -400,21 +628,34 @@ export default function ProductManagement() {
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200">
               <tr className="text-slate-500 bg-slate-50/80 backdrop-blur-md transition-colors">
-                <th className="py-4 px-6 font-black border-r border-slate-200">Category</th>
-                <th className="py-4 px-6 font-black text-right border-r border-slate-200">Cost</th>
-                <th className="py-4 px-6 font-black text-right border-r border-slate-200">Price</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">Product Name</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">Barcode</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Expiry</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">Category</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">Category 2</th>
+                <th className="py-4 px-6 font-black text-right border-r border-slate-200">Buying Price</th>
+                <th className="py-4 px-6 font-black text-right border-r border-slate-200">Seals Price</th>
                 <th className="py-4 px-6 font-black text-center border-r border-slate-200">Stock</th>
-                <th className="py-4 px-6 font-black text-right">Actions</th>
+                <th className="py-4 px-6 font-black text-center border-r border-slate-200">Unit</th>
+                <th className="py-4 px-6 font-black text-center border-r border-slate-200">Brand</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Expiry Date</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">Status</th>
+                <th className="py-4 px-6 font-black text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 transition-colors">
               {filteredProducts.map((product) => (
                 <tr key={product.id} className="hover:bg-slate-50 transition-colors group">
+                  <td className="py-4 px-6 border-r border-slate-100 text-slate-900 font-black italic tracking-widest">
+                    {product.name}
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-slate-400 tracking-tighter">
+                    {product.barcode}
+                  </td>
                   <td className="py-4 px-6 border-r border-slate-100 text-indigo-600 font-black italic">
-                    [{product.category_name || 'NULL_VEC'}]
+                    [{product.category_name || 'No Category'}]
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-100 text-indigo-650 font-black italic">
+                    [{product.category2_name || 'No Category 2'}]
                   </td>
                   <td className="py-4 px-6 text-right border-r border-slate-100 text-slate-400 font-bold italic">
                     {currency.symbol}{product.purchase_price.toFixed(2)}
@@ -422,19 +663,24 @@ export default function ProductManagement() {
                   <td className="py-4 px-6 text-right border-r border-slate-100 text-emerald-600 font-bold italic">
                     {currency.symbol}{product.selling_price.toFixed(2)}
                   </td>
-                  <td className="py-4 px-6 border-r border-slate-100 text-slate-900 font-black italic tracking-widest">
-                    {product.name}
+                  <td className="py-4 px-6 text-center border-r border-slate-100 animate-fade-in">
+                    <div className={`font-black italic underline decoration-offset-4 ${product.stock_quantity <= 10 ? 'text-red-600 decoration-red-900' : 'text-slate-400 decoration-slate-200 '}`}>
+                      {product.stock_quantity}
+                    </div>
                   </td>
-                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-slate-400 tracking-tighter">
-                    {product.barcode}
+                  <td className="py-4 px-6 text-center border-r border-slate-100 text-slate-500 font-bold italic">
+                    {product.unit_name || 'N/A'}
+                  </td>
+                  <td className="py-4 px-6 text-center border-r border-slate-100 text-slate-500 font-bold italic">
+                    {product.brand_name || 'Generic'}
                   </td>
                   <td className="py-4 px-6 border-r border-slate-100 text-center font-black italic text-red-500/70">
                     {product.expiry_date || 'N/A'}
                   </td>
-                  <td className="py-4 px-6 text-center border-r border-slate-100">
-                    <div className={`font-black italic underline decoration-offset-4 ${product.stock_quantity <= 10 ? 'text-red-600 decoration-red-900' : 'text-slate-400 decoration-slate-200 '}`}>
-                      {product.stock_quantity}
-                    </div>
+                  <td className="py-4 px-6 border-r border-slate-100 font-bold text-slate-400 tracking-tighter">
+                    <span className={`px-2 py-1 rounded text-[8px] font-black ${product.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      {product.status?.toUpperCase() || 'ACTIVE'}
+                    </span>
                   </td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-20 group-hover:opacity-100 transition-opacity">
@@ -450,7 +696,7 @@ export default function ProductManagement() {
               ))}
               {filteredProducts.length === 0 && !loading && (
                 <tr>
-                   <td colSpan={6} className="py-20 text-center font-black text-slate-300 tracking-[0.5em]">REGISTRY_NULL_SPACE</td>
+                   <td colSpan={11} className="py-20 text-center font-black text-slate-300 tracking-[0.5em]">REGISTRY_NULL_SPACE</td>
                 </tr>
               )}
             </tbody>
@@ -458,10 +704,7 @@ export default function ProductManagement() {
         )}
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div>PRODUCT_INDEX • {filteredProducts.length} ACTIVE_RECORDS • SYS_AUDIT_READY</div>
-         <div>LAST_SCAN_TIME : {new Date().toISOString()}</div>
-      </div>
+
 
       {/* Detail Overlay */}
       {selectedProductDetails && (
@@ -533,13 +776,17 @@ export default function ProductManagement() {
                          {importFile && <div className="mt-4 text-emerald-600 font-black italic underline underline-offset-4 decoration-emerald-200">{importFile.name}</div>}
                     </div>
                     <a 
-                      href="data:text/csv;charset=utf-8,name,barcode,category_id,brand_id,unit_id,purchase_price,selling_price,stock_quantity,supplier_id%0AExample Product,123456789,1,1,1,10.00,20.00,100,1"
-                      download="product_sample.csv"
+                      href={`data:text/csv;charset=utf-8,${encodeURIComponent('Name,Barcode,Category,Category2,Brand,Unit,Supplier,PurchasePrice,SellingPrice,StockQuantity,ExpiryDate\nPremium Product,123456789,General,Food,Generic,KG,Direct,10.00,20.00,100,2026-12-31')}`}
+                      download="product_import_template.csv"
                       className="block text-center py-2 bg-slate-600 text-white font-black text-[8px] tracking-widest hover:bg-slate-700 transition-all rounded"
                     >
                       Download Sample CSV
                     </a>
-                    {importStatus && <div className="text-[8px] font-black text-indigo-600 italic tracking-widest bg-slate-100 p-2 border border-slate-200">{importStatus}</div>}
+                    {importStatus && (
+                      <div className={`text-[10px] font-black italic tracking-widest p-3 border rounded shadow-inner ${importStatus.startsWith('Error') || importStatus.includes('Conflict') ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-indigo-600 border-slate-200'}`}>
+                        {importStatus}
+                      </div>
+                    )}
                     <button 
                         onClick={handleImport}
                         disabled={!importFile || importLoading}

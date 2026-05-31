@@ -1,14 +1,34 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Printer } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 interface PrintPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  hideHeader?: boolean;
 }
 
-export default function PrintPreviewModal({ isOpen, onClose, title, children }: PrintPreviewModalProps) {
+export default function PrintPreviewModal({ isOpen, onClose, title, children, hideHeader }: PrintPreviewModalProps) {
+  const [storeProfile, setStoreProfile] = useState<any>(null);
+  const { token } = useAuthStore();
+
+  useEffect(() => {
+    if (isOpen && token) {
+      fetch('/api/settings/store', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setStoreProfile(data.data);
+        }
+      })
+      .catch(console.error);
+    }
+  }, [isOpen, token]);
+
   if (!isOpen) return null;
 
   const handlePrint = () => {
@@ -16,6 +36,9 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children }: 
   };
 
   const now = new Date().toLocaleString();
+
+  const isReceipt = title.toLowerCase().includes('receipt');
+  const shouldHideHeader = hideHeader !== undefined ? hideHeader : isReceipt;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm print-hide" id="print-modal-overlay">
@@ -28,16 +51,18 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children }: 
         </div>
         
         <div className="flex-1 overflow-y-auto mb-4 print-content" id="print-content">
-          <div className="mb-6 flex justify-between items-center border-b pb-4">
+          {!shouldHideHeader && (
+            <div className="mb-6 flex justify-between items-center border-b pb-4">
               <div>
-                <h1 className="text-2xl font-black">TECH HAVEN POS</h1>
-                <p className="text-xs text-slate-500">123 TECH BOULEVARD, SILICON VALLEY</p>
+                <h1 className="text-2xl font-black">{storeProfile?.shop_name || 'KWE POS SYSTEM'}</h1>
+                <p className="text-xs text-slate-500">{storeProfile?.address || 'SYSTEM OVERVIEW REPORT'}</p>
               </div>
               <div className="text-right text-xs text-slate-500">
                 <p>REPORT: {title}</p>
                 <p>DATE: {now}</p>
               </div>
-          </div>
+            </div>
+          )}
           {children}
         </div>
         

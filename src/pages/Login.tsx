@@ -82,7 +82,15 @@ export default function Login() {
       }
     } catch (err: any) {
       console.error('Login request failed details:', err);
-      setError(`An error occurred during login: ${err?.message || err || 'Unknown'}`);
+      const isFetchError = err?.message?.includes('Failed to fetch') || 
+                           err?.message?.includes('NetworkError') || 
+                           String(err).includes('Failed to fetch') ||
+                           String(err).includes('TypeError: Failed to fetch');
+      if (isFetchError) {
+        setError('Failed to reach backend (Failed to fetch). The development server may be starting up, rebooting, or compiling. Please wait 5-10 seconds and try again.');
+      } else {
+        setError(`An error occurred during login: ${err?.message || err || 'Unknown'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -97,26 +105,19 @@ export default function Login() {
           </div>
         </div>
         <div className="text-center space-y-2">
-            <h2 className="text-[14px] font-black text-slate-900 tracking-[0.2em]">CORE_SYSTEM_ACCESS_v1.0</h2>
-            <div className="text-[7px] text-slate-400 font-black tracking-widest">SECURED_GATEWAY_TERMINAL</div>
-            <div className="text-[7px] text-indigo-600 font-bold tracking-widest mt-4">
-              LOGIN_DEFAULT : [ADMIN] / [ADMIN123]
-            </div>
+            <h2 className="text-[16px] font-black text-slate-900 tracking-[0.2em]">KWE POS SYSTEM</h2>
+            <div className="text-[7px] text-slate-400 font-black tracking-widest">AUTHORIZED PERSONNEL LOGIN</div>
         </div>
       </div>
 
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md space-y-4">
         {/* Supabase Status Banner */}
-        {configStatus && (
-          <div className={`p-4 border rounded-lg flex flex-col gap-2 transition-all ${
-            configStatus.isConnected 
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-              : 'bg-amber-50 border-amber-200 text-amber-800'
-          }`}>
+        {configStatus && !configStatus.isConnected && (
+          <div className="p-4 border rounded-lg flex flex-col gap-2 transition-all bg-amber-50 border-amber-200 text-amber-800">
             <div className="flex items-center justify-between font-bold tracking-wider">
               <div className="flex items-center gap-2">
                 <Server className="w-4 h-4" />
-                <span>DATABASE STATE: {configStatus.isConnected ? 'ONLINE_READY' : 'SETUP_REQUIRED'}</span>
+                <span>DATABASE STATE: SETUP_REQUIRED</span>
               </div>
               <button 
                 type="button"
@@ -181,24 +182,24 @@ export default function Login() {
           <form className="space-y-6" onSubmit={handleLogin}>
             {error && (
               <div className="bg-red-500/5 border border-red-500/20 text-red-600 p-4 rounded text-[9px] font-black tracking-widest text-center">
-                ERROR_BIT: {error.toUpperCase()}
+                Error: {error.toUpperCase()}
               </div>
             )}
             
             <div className="space-y-1.5">
-              <label className="block text-[8px] font-black text-slate-400 tracking-[0.2em]">IDENT_ID_STRING</label>
+              <label className="block text-[8px] font-black text-slate-400 tracking-[0.2em]">USERNAME</label>
               <input
                 type="text"
                 required
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 text-slate-900 text-[10px] font-black rounded outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="ID_STRING..."
+                placeholder="Enter username..."
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[8px] font-black text-slate-400 tracking-[0.2em]">ACCESS_KEY_BUFFER</label>
+              <label className="block text-[8px] font-black text-slate-400 tracking-[0.2em]">PASSWORD</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-3.5 w-3.5 text-slate-400" />
@@ -220,9 +221,9 @@ export default function Login() {
                 disabled={loading}
                 className="w-full flex justify-center items-center gap-2 py-4 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black tracking-[0.3em] rounded transition-all shadow-xl shadow-indigo-500/10 disabled:opacity-50"
               >
-                {loading ? 'SYNCING_CREDENTIALS...' : (
+                {loading ? 'LOGGING IN...' : (
                   <>
-                    <LogIn className="w-4 h-4" /> SAVE_ACCESS_v1.0
+                    <LogIn className="w-4 h-4" /> LOGIN
                   </>
                 )}
               </button>
@@ -231,7 +232,7 @@ export default function Login() {
         </div>
         
         <div className="mt-8 text-center text-slate-400 text-[7px] font-black tracking-[0.4em] opacity-50">
-          PROTECTED_BY_CRYPTO_CORE • SECTOR_09
+          KWE POS SYSTEM • ALL RIGHTS RESERVED
         </div>
       </div>
     </div>

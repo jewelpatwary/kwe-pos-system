@@ -104,14 +104,7 @@ export default function CashManagement() {
 
       </div>
 
-      {/* Footer Status Bar */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div className="flex gap-4">
-            <span>Register ID : {Math.random().toString(16).substring(2, 10).toUpperCase()}</span>
-            <span>UPTIME : 12h_42m_05s</span>
-         </div>
-         <div>SYSTEM_READY.SECURE_LAYER_6 : {new Date().toISOString()}</div>
-      </div>
+
     </div>
   );
 }

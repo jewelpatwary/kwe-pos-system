@@ -284,10 +284,7 @@ export default function Labels() {
 
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div>ENGINE_STATUS: IDLE // BUFFER_SIZE: {labelsToRender.length} UNITS</div>
-         <div>SYSTEM_READY_FOR_IO</div>
-      </div>
+
 
       {/* --- HIDDEN PRINT AREA --- */}
       <div id="print-area" className="hidden print:flex relative bg-white items-start content-start">

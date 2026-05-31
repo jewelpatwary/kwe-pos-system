@@ -1,6 +1,8 @@
 {
   "name": "KWE POS System",
-  "description": "An offline-first POS, Inventory, and ERP system with role-based access control.",
+  "description": "Premium Full-Stack POS System with PDF Reporting and Purchase Management",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

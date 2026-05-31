@@ -223,14 +223,7 @@ export default function CreditEngine() {
 
       </div>
 
-      {/* Footer Status Bar */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div className="flex gap-4">
-            <span>ENG_IDENT : {Math.random().toString(36).substring(7).toUpperCase()}</span>
-            <span>CYC_UPTIME : 142ms_P50</span>
-         </div>
-         <div>SYSTEM_READY.ENGINE_CORE : {new Date().toISOString()}</div>
-      </div>
+
 
       {/* Config Overlay */}
       {showConfigForm && (

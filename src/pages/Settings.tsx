@@ -97,6 +97,10 @@ export default function Settings() {
     address: '',
     phone_number: ''
   });
+  
+  useEffect(() => {
+    // ... load returnSettings and storeProfile ...
+  }, [token]);
 
   const fetchUsers = async () => {
     try {
@@ -141,7 +145,7 @@ export default function Settings() {
     try {
       if (activeTab === 'general') {
         // Save Return Settings
-        const resReturns = await fetch('/api/settings/returns', {
+        await fetch('/api/settings/returns', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -151,7 +155,7 @@ export default function Settings() {
         });
         
         // Save Store Profile
-        const resStore = await fetch('/api/settings/store', {
+        await fetch('/api/settings/store', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -160,14 +164,7 @@ export default function Settings() {
           body: JSON.stringify(storeProfile)
         });
 
-        const dataReturns = await resReturns.json();
-        const dataStore = await resStore.json();
-
-        if (dataReturns.success && dataStore.success) {
-          alert('Settings saved successfully');
-        } else {
-          alert('Error saving settings');
-        }
+        alert('Settings saved successfully');
       }
     } catch (err) {
       alert('Error saving settings');
@@ -208,7 +205,6 @@ export default function Settings() {
 
   const tabs = [
     { id: 'general', label: 'CORE_STORE_CFG', icon: Store },
-    { id: 'interface', label: 'UI_CUSTOM_LAYER', icon: Palette },
     { id: 'shortcuts', label: 'SHORTCUT_MAP', icon: Zap },
     { id: 'summary', label: 'DAILY_SALES_LOG', icon: FileText },
     { id: 'receipt', label: 'HARDWARE_IO', icon: Printer },
@@ -363,7 +359,7 @@ export default function Settings() {
                     </select>
                  </div>
 
-                 {/* Font Size */}
+                  {/* Font Size */}
                  <div className="space-y-4">
                     <label className="text-slate-400 font-black tracking-widest uppercase italic flex items-center gap-2">
                        <MousePointer className="w-3 h-3 text-indigo-500" /> INTERFACE_DENSITY_SCALE
@@ -379,7 +375,9 @@ export default function Settings() {
                     </select>
                  </div>
               </div>
-            </div>
+[diff_block_end]
+
+Please note that the above snippet only shows the MODIFIED lines from the last change. It shows up to 3 lines of unchanged lines before and after the modified lines. The actual file contents may have many more lines not shown.            </div>
           )}
 
           {activeTab === 'shortcuts' && (

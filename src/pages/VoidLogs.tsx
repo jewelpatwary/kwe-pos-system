@@ -110,10 +110,7 @@ export default function VoidLogs() {
         </table>
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div>SHIELD_AUDIT_PROTOCOL_v0.9 • {filteredLogs.length} EVENTS</div>
-         <div>SYSTEM_READY.AUDIT_MODE : {new Date().toISOString()}</div>
-      </div>
+
     </div>
   );
 }

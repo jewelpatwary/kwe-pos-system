@@ -150,16 +150,7 @@ export default function SalesReport() {
         </table>
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div className="flex items-center gap-2">
-            <BarChart3 className="w-3 h-3 text-indigo-600" />
-            <span>SYSTEM_LEADER_ARCHIVE • {rows.length} RECORD_SETS</span>
-         </div>
-         <div className="flex items-center gap-2 uppercase italic">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500" />
-            <span>VERIFIED_AUDIT_STAMP : {new Date().toISOString()}</span>
-         </div>
-      </div>
+
     </div>
   );
 }

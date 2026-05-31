@@ -230,13 +230,7 @@ export default function InventoryManagement() {
             </div>
         </div>
 
-        <div className="p-2 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-            <div className="flex gap-4">
-                <span>NET_VAR: <span className={activeSession.items.reduce((acc: number, i: any) => acc + i.value_difference, 0) < 0 ? 'text-red-600 ' : 'text-emerald-600 '}>{currency.symbol}{activeSession.items.reduce((acc: number, i: any) => acc + i.value_difference, 0).toFixed(2)}</span></span>
-                <span>AUDIT_LOAD: {activeSession.items.length}_ITEMS</span>
-            </div>
-            <div>STATUS: UNBOUND_DRAFT_STATE</div>
-        </div>
+
       </div>
     );
   }
@@ -297,13 +291,7 @@ export default function InventoryManagement() {
             </table>
         </div>
 
-        <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-            <div className="flex gap-4">
-                <span>TOTAL_SESSIONS: {stats?.summary?.total_sessions || 0}</span>
-                <span>NET_VAR_ALL: <span className={(stats?.summary?.net_variance || 0) < 0 ? 'text-red-600 ' : 'text-emerald-600 '}>{currency.symbol}{(stats?.summary?.net_variance || 0).toFixed(2)}</span></span>
-            </div>
-            <div>SYSTEM_READY : {new Date().toISOString()}</div>
-        </div>
+
       </div>
     );
 }

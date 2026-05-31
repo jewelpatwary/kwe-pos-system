@@ -114,17 +114,7 @@ export default function CustomerReturnsReport() {
         </table>
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div className="flex gap-6 uppercase italic">
-            <div className="flex items-center gap-1">TOTAL_DEBIT_VAL: <span className="text-slate-900">{currency.symbol}{summary.totalValue.toFixed(2)}</span></div>
-            <div className="flex items-center gap-1">EXCH_VECTOR: <span className="text-indigo-600">{summary.exchangeCount}</span></div>
-            <div className="flex items-center gap-1">CASH_VECTOR: <span className="text-emerald-600">{summary.cashCount}</span></div>
-         </div>
-         <div className="flex items-center gap-2 uppercase italic">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500" />
-            <span>SYSTEM_TIME_STAMP : {new Date().toISOString()}</span>
-         </div>
-      </div>
+
     </div>
   );
 }

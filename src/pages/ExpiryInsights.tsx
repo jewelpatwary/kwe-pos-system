@@ -81,167 +81,158 @@ const ExpiryInsights: React.FC = () => {
   };
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <ShieldAlert className="w-8 h-8 text-red-500" />
-              EXPIRY_INSIGHTS_PROTOCOL
-            </h1>
-            <p className="text-slate-500 text-sm font-medium">Critical inventory end-of-life status monitoring</p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <select 
-                value={daysThreshold}
-                onChange={(e) => setDaysThreshold(parseInt(e.target.value))}
-                className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20"
-              >
-                <option value={30}>EXPIRES_IN_30_DAYS</option>
-                <option value={60}>EXPIRES_IN_60_DAYS</option>
-                <option value={90}>EXPIRES_IN_90_DAYS</option>
-                <option value={180}>EXPIRES_IN_180_DAYS</option>
-                <option value={365}>EXPIRY_INSIGHTS_PROTOCOL</option>
-              </select>
-            </div>
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-black hover:opacity-90 transition shadow-lg">
-              <Download className="w-4 h-4" />
-              EXPORT_LOG
-            </button>
-          </div>
+    <div className="p-0 h-full flex flex-col bg-slate-50 text-slate-800 font-sans text-[10px] uppercase transition-colors duration-300">
+      {/* Header Area */}
+      <div className="bg-slate-50 border-b border-slate-200 p-3 flex flex-wrap items-center justify-between sticky top-0 z-20 shadow-md">
+        <div className="flex items-center gap-3">
+          <ShieldAlert className="w-4 h-4 text-red-500" />
+          <span className="text-slate-900 font-black tracking-widest">EXPIRY_INSIGHTS_PROTOCOL</span>
         </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <select 
+              value={daysThreshold}
+              onChange={(e) => setDaysThreshold(parseInt(e.target.value))}
+              className="pl-8 pr-4 py-1.5 bg-white border border-slate-200 text-[9px] font-black text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-inner rounded"
+            >
+              <option value={30}>EXPIRES_IN_30_DAYS</option>
+              <option value={60}>EXPIRES_IN_60_DAYS</option>
+              <option value={90}>EXPIRES_IN_90_DAYS</option>
+              <option value={180}>EXPIRES_IN_180_DAYS</option>
+              <option value={365}>EXPIRES_IN_365_DAYS</option>
+            </select>
+          </div>
+          <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-[9px] tracking-widest transition shadow-md rounded">
+            <Download className="w-3.5 h-3.5" />
+            EXPORT_LOG
+          </button>
+        </div>
+      </div>
 
+      <div className="flex-1 overflow-auto p-6 flex flex-col gap-6 custom-scrollbar bg-white">
+        
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="bg-white p-4 border border-slate-200 flex flex-col relative overflow-hidden shadow-sm">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
+              <div className="p-1 px-2 bg-red-100 border border-red-200 rounded text-red-600 font-black text-[8px] tracking-widest uppercase">
+                CRITICAL_EXPIRED
               </div>
-              <span className="text-xs font-black text-slate-400 tracking-wider">CRITICAL_EXPIRED</span>
             </div>
-            <div className="text-3xl font-black text-slate-900">
+            <div className="text-3xl font-black text-slate-900 italic tracking-tighter">
               {items.filter(i => getDaysRemaining(i.expiry_date) <= 0).length}
             </div>
           </div>
           
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="bg-white p-4 border border-slate-200 flex flex-col relative overflow-hidden shadow-sm">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Clock className="w-5 h-5 text-orange-600" />
+              <div className="p-1 px-2 bg-orange-100 border border-orange-200 rounded text-orange-600 font-black text-[8px] tracking-widest uppercase">
+                EXPIRING_30D
               </div>
-              <span className="text-xs font-black text-slate-400 tracking-wider">EXPIRING_30D</span>
             </div>
-            <div className="text-3xl font-black text-slate-900">
+            <div className="text-3xl font-black text-slate-900 italic tracking-tighter">
               {items.filter(i => getDaysRemaining(i.expiry_date) > 0 && getDaysRemaining(i.expiry_date) <= 30).length}
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="bg-white p-4 border border-slate-200 flex flex-col relative overflow-hidden shadow-sm">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-amber-100 rounded-lg">
-                <Package className="w-5 h-5 text-amber-600" />
+              <div className="p-1 px-2 bg-amber-100 border border-amber-200 rounded text-amber-600 font-black text-[8px] tracking-widest uppercase">
+                TOTAL_RISK_ATTRITION
               </div>
-              <span className="text-xs font-black text-slate-400 tracking-wider">TOTAL_RISK_ATTRITION</span>
             </div>
-            <div className="text-3xl font-black text-slate-900">
+            <div className="text-3xl font-black text-slate-900 italic tracking-tighter">
               {filteredItems.length}
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="bg-white p-4 border border-slate-200 flex flex-col relative overflow-hidden shadow-sm">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <ArrowRight className="w-5 h-5 text-emerald-600" />
+              <div className="p-1 px-2 bg-emerald-100 border border-emerald-200 rounded text-emerald-600 font-black text-[8px] tracking-widest uppercase">
+                REMAINING_STOCK
               </div>
-              <span className="text-xs font-black text-slate-400 tracking-wider">REMAINING_STOCK</span>
             </div>
-            <div className="text-3xl font-black text-slate-900">
+            <div className="text-3xl font-black text-slate-900 italic tracking-tighter">
               {filteredItems.reduce((acc, curr) => acc + curr.total_stock, 0)}
             </div>
           </div>
         </div>
 
         {/* Content Table */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
-          <div className="p-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-white border border-slate-200 flex flex-col overflow-hidden shadow-sm">
+          <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50">
             <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input 
                 type="text" 
                 placeholder="PROBE_PRODUCT_NAME_OR_BARCODE..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-slate-500/20"
+                className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded pl-10 pr-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-inner uppercase tracking-widest"
               />
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse text-[10px] uppercase font-sans">
               <thead>
-                <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-200">
-                  <th className="py-4 px-6">PRODUCT_DESCRIPTOR</th>
-                  <th className="py-4 px-6 text-center">BATCH_ID</th>
-                  <th className="py-4 px-6 text-center">EXP_DATE</th>
-                  <th className="py-4 px-6 text-center">TTL_STOCK</th>
-                  <th className="py-4 px-6 text-center">STATUS_FLAGS</th>
-                  <th className="py-4 px-6">SUPPLY_ORIGIN</th>
+                <tr className="bg-slate-50 text-slate-500 text-[8px] uppercase font-black tracking-widest border-b border-slate-200">
+                  <th className="py-3 px-4 border-r border-slate-200/50">PRODUCT_DESCRIPTOR</th>
+                  <th className="py-3 px-4 text-center border-r border-slate-200/50">BATCH_ID</th>
+                  <th className="py-3 px-4 text-center border-r border-slate-200/50">EXP_DATE</th>
+                  <th className="py-3 px-4 text-center border-r border-slate-200/50">TTL_STOCK</th>
+                  <th className="py-3 px-4 text-center border-r border-slate-200/50">STATUS_FLAGS</th>
+                  <th className="py-3 px-4">SUPPLY_ORIGIN</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 font-black animate-pulse">SYNCHRONIZING_EXPIRY_DATA...</td>
+                    <td colSpan={6} className="py-12 text-center text-slate-400 font-black animate-pulse tracking-widest text-[9px]">SYNCHRONIZING_EXPIRY_DATA...</td>
                   </tr>
                 ) : filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 font-black">NO_CRITICAL_EXPIRY_THRESHOLD_DETECTED</td>
+                    <td colSpan={6} className="py-12 text-center text-slate-400 font-black tracking-widest text-[9px]">NO_CRITICAL_EXPIRY_THRESHOLD_DETECTED</td>
                   </tr>
                 ) : (
                   filteredItems.map((item) => {
                     const daysLeft = getDaysRemaining(item.expiry_date);
                     return (
-                      <motion.tr 
+                      <tr 
                         key={item.batch_id} 
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }}
-                        className="hover:bg-slate-50/50 transition-colors"
+                        className="hover:bg-slate-50 transition-colors"
                       >
-                        <td className="py-4 px-6">
-                            <div className="text-sm font-black text-slate-900 uppercase tracking-tight">{item.product_name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono mt-1">{item.barcode}</div>
+                        <td className="py-3 px-4 border-r border-slate-200/50">
+                            <div className="font-black text-slate-900 italic tracking-tighter text-[11px] leading-tight uppercase underline underline-offset-4 decoration-indigo-500/30 decoration-2">{item.product_name}</div>
+                            <div className="text-[7px] text-slate-400 font-bold tracking-widest mt-1 uppercase">[{item.barcode || 'NULL_BARCODE'}]</div>
                         </td>
-                        <td className="py-4 px-6 text-center">
-                            <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-mono rounded border border-slate-200">
+                        <td className="py-3 px-4 text-center border-r border-slate-200/50">
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[8px] font-black uppercase tracking-widest rounded border border-slate-200">
                                 {item.batch_number || 'N/A'}
                             </span>
                         </td>
-                        <td className="py-4 px-6 text-center">
-                            <div className="text-xs font-black text-slate-900">{item.expiry_date}</div>
-                            <div className={`text-[10px] font-black mt-0.5 ${daysLeft <= 30 ? 'text-red-500' : 'text-slate-400'}`}>
+                        <td className="py-3 px-4 text-center border-r border-slate-200/50">
+                            <div className="text-[10px] font-black text-slate-900 italic font-mono">{item.expiry_date}</div>
+                            <div className={`text-[8px] font-black mt-1 tracking-wider ${daysLeft <= 30 ? 'text-red-500' : 'text-slate-400'}`}>
                                 {daysLeft <= 0 ? 'STATUS: EXPIRED' : `T-MINUS: ${daysLeft} DAYS`}
                             </div>
                         </td>
-                        <td className="py-4 px-6 text-center">
-                            <div className="text-lg font-black text-slate-900">{item.total_stock}</div>
-                            <div className="text-[10px] text-slate-400 font-black">IN_SYSTEM_STOCK</div>
+                        <td className="py-3 px-4 text-center border-r border-slate-200/50">
+                            <div className="text-[12px] font-black text-slate-900 italic">{item.total_stock}</div>
+                            <div className="text-[7px] text-slate-400 font-bold mt-1 tracking-widest uppercase">SYS_RESERVE</div>
                         </td>
-                        <td className="py-4 px-6 text-center">
-                            <div className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black border ${getStatusColor(item.expiry_date)}`}>
+                        <td className="py-3 px-4 text-center border-r border-slate-200/50">
+                            <div className={`inline-flex items-center px-2 py-0.5 rounded text-[8px] font-black border tracking-widest ${getStatusColor(item.expiry_date)}`}>
                                 {daysLeft <= 0 ? 'CRITICAL_FAIL' : daysLeft <= 30 ? 'URGENT_LIQUIDATE' : 'MONITOR_CLOSELY'}
                             </div>
                         </td>
-                        <td className="py-4 px-6">
-                            <div className="text-[10px] font-black text-slate-900">{item.supplier_name || 'UNKNOWN_SOURCE'}</div>
-                            <div className="text-[10px] text-slate-400 font-mono uppercase mt-0.5">INV: {item.invoice_number || 'SYSTEM'}</div>
+                        <td className="py-3 px-4">
+                            <div className="text-[10px] font-black text-slate-900 italic tracking-widest">{item.supplier_name || 'UNKNOWN_SOURCE'}</div>
+                            <div className="text-[7px] text-slate-400 font-bold uppercase mt-1 tracking-widest">INV: {item.invoice_number || 'SYSTEM'}</div>
                         </td>
-                      </motion.tr>
+                      </tr>
                     );
                   })
                 )}

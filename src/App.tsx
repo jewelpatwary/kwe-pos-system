@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './components/ThemeProvider';
 import POS from './pages/POS';
@@ -17,9 +18,11 @@ import VoidLogs from './pages/VoidLogs';
 import MasterData from './pages/MasterData';
 import Settings from './pages/Settings';
 import Reports from './pages/Reports';
+import Requisition from './pages/Requisition';
 import CashManagement from './pages/CashManagement';
 import InventoryManagement from './pages/InventoryManagement';
 import InventoryAudit from './pages/InventoryAudit';
+import SystemAdmin from './pages/SystemAdmin';
 import PurchaseManagement from './pages/PurchaseManagement';
 import ExpenseManagement from './pages/ExpenseManagement';
 import StockAdjustment from './pages/StockAdjustment';
@@ -34,6 +37,10 @@ import PurchasePaymentPage from './pages/PurchasePaymentPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
+  useEffect(() => {
+    document.title = "KWE POS System";
+  }, []);
+
   return (
     <ThemeProvider>
       <BrowserRouter>
@@ -54,6 +61,7 @@ function App() {
             <Route path="products" element={<ProductManagement />} />
             <Route path="stock-adjustment" element={<StockAdjustment />} />
             <Route path="purchase-invoices" element={<PurchaseManagement />} />
+            <Route path="requisition" element={<Requisition />} />
             <Route path="inventory" element={<InventoryManagement />} />
             <Route path="inventory-audit" element={<InventoryAudit />} />
             <Route path="expenses" element={<ExpenseManagement />} />
@@ -78,8 +86,8 @@ function App() {
             <Route path="categories" element={<MasterData />} />
             <Route path="brands" element={<MasterData />} />
             <Route path="units" element={<MasterData />} />
-            <Route path="currencies" element={<MasterData />} />
             <Route path="users" element={<UserManagement />} />
+            <Route path="system" element={<SystemAdmin />} />
             <Route path="cash" element={<CashManagement />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />

@@ -10,14 +10,48 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
+  html {
+    font-size: var(--font-size-global, 14px) !important;
+  }
   body {
     @apply bg-white  transition-colors duration-300 antialiased;
     font-family: var(--font-family-global, ui-sans-serif);
-    font-size: var(--font-size-global, 16px);
+    font-size: var(--font-size-global, 14px);
     color: var(--color-slate-900);
   }
   .dark body {
     color: #d1d5db;
+  }
+
+  /* Globally scale hardcoded pixel and standard font-sizes based on layout multiplier */
+  .text-\[6px\] { font-size: calc(6px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[7px\] { font-size: calc(7px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[8px\] { font-size: calc(8px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[9px\] { font-size: calc(9px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[10px\] { font-size: calc(10px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[11px\] { font-size: calc(11px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[12px\] { font-size: calc(12px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[13px\] { font-size: calc(13px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[14px\] { font-size: calc(14px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[16px\] { font-size: calc(16px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[18px\] { font-size: calc(18px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[20px\] { font-size: calc(20px * var(--font-size-multiplier, 1)) !important; }
+  .text-\[24px\] { font-size: calc(24px * var(--font-size-multiplier, 1)) !important; }
+  .text-xs { font-size: calc(0.75rem * var(--font-size-multiplier, 1)) !important; }
+  .text-sm { font-size: calc(0.875rem * var(--font-size-multiplier, 1)) !important; }
+  .text-base { font-size: calc(1rem * var(--font-size-multiplier, 1)) !important; }
+  .text-lg { font-size: calc(1.125rem * var(--font-size-multiplier, 1)) !important; }
+  .text-xl { font-size: calc(1.25rem * var(--font-size-multiplier, 1)) !important; }
+  .text-2xl { font-size: calc(1.5rem * var(--font-size-multiplier, 1)) !important; }
+  .text-3xl { font-size: calc(1.875rem * var(--font-size-multiplier, 1)) !important; }
+  .text-4xl { font-size: calc(2.25rem * var(--font-size-multiplier, 1)) !important; }
+  .text-5xl { font-size: calc(3rem * var(--font-size-multiplier, 1)) !important; }
+  .text-6xl { font-size: calc(3.75rem * var(--font-size-multiplier, 1)) !important; }
+  .text-7xl { font-size: calc(4.5rem * var(--font-size-multiplier, 1)) !important; }
+
+  /* Force normal font-style globally (remove default and classes font-style: italic) */
+  *, *::before, *::after, .italic {
+    font-style: normal !important;
   }
 }
 

@@ -268,13 +268,7 @@ export default function Reports() {
         )}
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-[8px] font-black tracking-widest text-[#475569] transition-colors">
-         <div className="flex gap-4">
-            <span>AGG_VOLUME : {reportData?.categoryBreakdown?.length || 0} SECTORS</span>
-            <span>NET_SUMMATION : <span className="text-emerald-400 font-black italic">{currency.symbol}{reportData?.summary?.grandTotal?.toFixed(2) || '0.00'}</span></span>
-         </div>
-         <div>SYSTEM_TIME_OFFS : {new Date().toISOString()}</div>
-      </div>
+
     </div>
   );
 }
