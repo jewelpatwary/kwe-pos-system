@@ -20,9 +20,18 @@ process.on('uncaughtException', (error) => {
 });
 
 // --- DATA FILE CONFIGURATION ---
-const DATA_DIR = path.join(process.cwd(), 'src', 'server', 'data');
+// Use /tmp for serverless environments (Vercel) to avoid read-only filesystem errors,
+// although we are moving towards Supabase for all persistent storage.
+const DATA_DIR = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' 
+  ? path.join('/tmp', 'pos-data')
+  : path.join(process.cwd(), 'src', 'server', 'data');
+
 if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch (err) {
+    console.warn('Failed to create DATA_DIR, might be in a read-only environment:', err);
+  }
 }
 const CAT2_FILE = path.join(DATA_DIR, 'categories2.json');
 const PROD_CAT2_FILE = path.join(DATA_DIR, 'product_category2.json');
@@ -38,67 +47,117 @@ const EXPENSE_CATEGORIES_FILE = path.join(DATA_DIR, 'expense_categories.json');
 const SEED_LOCK_FILE = path.join(DATA_DIR, 'seed.lock');
 
 function readCategories2() {
-  if (!fs.existsSync(CAT2_FILE)) return [];
-  try { return JSON.parse(fs.readFileSync(CAT2_FILE, 'utf-8')); } catch (e) { return []; }
+  try {
+    if (!fs.existsSync(CAT2_FILE)) return [];
+    return JSON.parse(fs.readFileSync(CAT2_FILE, 'utf-8'));
+  } catch (e) { return []; }
 }
-function writeCategories2(data: any) { fs.writeFileSync(CAT2_FILE, JSON.stringify(data, null, 2)); }
+function writeCategories2(data: any) { 
+  try {
+    fs.writeFileSync(CAT2_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write Categories2 to local file:', e.message);
+  }
+}
 
 function readProductCategory2() {
-  if (!fs.existsSync(PROD_CAT2_FILE)) return {};
-  try { return JSON.parse(fs.readFileSync(PROD_CAT2_FILE, 'utf-8')); } catch (e) { return {}; }
+  try {
+    if (!fs.existsSync(PROD_CAT2_FILE)) return {};
+    return JSON.parse(fs.readFileSync(PROD_CAT2_FILE, 'utf-8'));
+  } catch (e) { return {}; }
 }
-function writeProductCategory2(data: any) { fs.writeFileSync(PROD_CAT2_FILE, JSON.stringify(data, null, 2)); }
+function writeProductCategory2(data: any) { 
+  try {
+    fs.writeFileSync(PROD_CAT2_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write ProductCategory2 to local file:', e.message);
+  }
+}
 
 function readPaymentTypes() {
-  if (!fs.existsSync(PAYMENT_TYPES_FILE)) {
-    const initial = [
-      { id: 1, name: 'Cash', status: 'active' },
-      { id: 2, name: 'Bank', status: 'active' },
-      { id: 3, name: 'Credit', status: 'active' }
-    ];
-    fs.writeFileSync(PAYMENT_TYPES_FILE, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-  try { return JSON.parse(fs.readFileSync(PAYMENT_TYPES_FILE, 'utf-8')); } catch (e) { return []; }
+  try {
+    if (!fs.existsSync(PAYMENT_TYPES_FILE)) {
+      const initial = [
+        { id: 1, name: 'Cash', status: 'active' },
+        { id: 2, name: 'Bank', status: 'active' },
+        { id: 3, name: 'Credit', status: 'active' }
+      ];
+      try {
+        fs.writeFileSync(PAYMENT_TYPES_FILE, JSON.stringify(initial, null, 2));
+      } catch (e) {}
+      return initial;
+    }
+    return JSON.parse(fs.readFileSync(PAYMENT_TYPES_FILE, 'utf-8'));
+  } catch (e) { return []; }
 }
-function writePaymentTypes(data: any) { fs.writeFileSync(PAYMENT_TYPES_FILE, JSON.stringify(data, null, 2)); }
+function writePaymentTypes(data: any) { 
+  try {
+    fs.writeFileSync(PAYMENT_TYPES_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write PaymentTypes to local file:', e.message);
+  }
+}
 
 function readInvoiceCategories() {
-  if (!fs.existsSync(INVOICE_CATEGORIES_FILE)) {
-    const initial = [
-      { id: 1, name: 'Minimart', status: 'active' },
-      { id: 2, name: 'Canteen', status: 'active' }
-    ];
-    fs.writeFileSync(INVOICE_CATEGORIES_FILE, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-  try { return JSON.parse(fs.readFileSync(INVOICE_CATEGORIES_FILE, 'utf-8')); } catch (e) { return []; }
+  try {
+    if (!fs.existsSync(INVOICE_CATEGORIES_FILE)) {
+      const initial = [
+        { id: 1, name: 'Minimart', status: 'active' },
+        { id: 2, name: 'Canteen', status: 'active' }
+      ];
+      try {
+        fs.writeFileSync(INVOICE_CATEGORIES_FILE, JSON.stringify(initial, null, 2));
+      } catch (e) {}
+      return initial;
+    }
+    return JSON.parse(fs.readFileSync(INVOICE_CATEGORIES_FILE, 'utf-8'));
+  } catch (e) { return []; }
 }
-function writeInvoiceCategories(data: any) { fs.writeFileSync(INVOICE_CATEGORIES_FILE, JSON.stringify(data, null, 2)); }
+function writeInvoiceCategories(data: any) { 
+  try {
+    fs.writeFileSync(INVOICE_CATEGORIES_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write InvoiceCategories to local file:', e.message);
+  }
+}
 
 function readPIExt() {
-  if (!fs.existsSync(PI_EXT_FILE)) {
-    fs.writeFileSync(PI_EXT_FILE, JSON.stringify({}, null, 2));
-    return {};
-  }
-  try { return JSON.parse(fs.readFileSync(PI_EXT_FILE, 'utf-8')); } catch (e) { return {}; }
+  try {
+    if (!fs.existsSync(PI_EXT_FILE)) {
+      try {
+        fs.writeFileSync(PI_EXT_FILE, JSON.stringify({}, null, 2));
+      } catch (e) {}
+      return {};
+    }
+    return JSON.parse(fs.readFileSync(PI_EXT_FILE, 'utf-8'));
+  } catch (e) { return {}; }
 }
-function writePIExt(data: any) { fs.writeFileSync(PI_EXT_FILE, JSON.stringify(data, null, 2)); }
+function writePIExt(data: any) { 
+  try {
+    fs.writeFileSync(PI_EXT_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write PIExt to local file:', e.message);
+  }
+}
 
 function readExpenseCategories() {
-  if (!fs.existsSync(EXPENSE_CATEGORIES_FILE)) {
-    const initial: string[] = [];
-    fs.writeFileSync(EXPENSE_CATEGORIES_FILE, JSON.stringify(initial, null, 2));
-    return initial;
-  }
   try {
+    if (!fs.existsSync(EXPENSE_CATEGORIES_FILE)) {
+      const initial: string[] = [];
+      try {
+        fs.writeFileSync(EXPENSE_CATEGORIES_FILE, JSON.stringify(initial, null, 2));
+      } catch (e) {}
+      return initial;
+    }
     return JSON.parse(fs.readFileSync(EXPENSE_CATEGORIES_FILE, 'utf-8'));
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { return []; }
 }
 function writeExpenseCategories(data: any) {
-  fs.writeFileSync(EXPENSE_CATEGORIES_FILE, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(EXPENSE_CATEGORIES_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.warn('Failed to write ExpenseCategories to local file:', e.message);
+  }
 }
 
 // Proxy supabase to implement lazy initialization
@@ -145,17 +204,21 @@ app.use(express.json({ limit: '50mb' }));
 
 // Initialize Database in the background synchronously to avoid blocking module import in serverless environments
 initDB();
-if (process.env.VERCEL !== '1' && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  const isAlreadySeeded = fs.existsSync(SEED_LOCK_FILE);
+if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  // Safe check for seeded status - in Vercel we rely on Supabase settings only, 
+  // elsewhere we can use a local lock file for efficiency.
+  const isAlreadySeeded = process.env.VERCEL !== '1' ? fs.existsSync(SEED_LOCK_FILE) : true; 
+  // We pass true to skipMockData on Vercel to be safe, unless we really need it.
+  // Actually seedProducts handles Supabase setting too.
   seedProducts(isAlreadySeeded).then(() => {
-    if (!isAlreadySeeded) {
-      fs.writeFileSync(SEED_LOCK_FILE, 'seeded at ' + new Date().toISOString());
+    if (!isAlreadySeeded && process.env.VERCEL !== '1') {
+      try {
+        fs.writeFileSync(SEED_LOCK_FILE, 'seeded at ' + new Date().toISOString());
+      } catch (e) {}
     }
   }).catch((err: any) => {
-    console.error("Database seeding failed in the background:", err);
+    console.error("Database initialization check failed:", err);
   });
-} else {
-  console.log("Skipping background database seeding (running on Vercel or missing credentials).");
 }
 
 // --- API ROUTES ---
