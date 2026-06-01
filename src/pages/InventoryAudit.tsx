@@ -193,14 +193,21 @@ export default function InventoryAudit() {
       setLoading(true);
       const res = await fetch('/api/admin/inventory/sessions', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       const data = await res.json();
       if (data.success) {
         openSession(data.id);
+      } else {
+        alert(data.message || 'FAILED_TO_START_AUDIT');
+        setLoading(false);
       }
     } catch (err) {
       console.error(err);
+      alert('AUDIT_SERVICE_OFFLINE');
       setLoading(false);
     }
   };

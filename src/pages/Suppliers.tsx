@@ -133,7 +133,7 @@ export default function Suppliers() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input 
             type="text"
-            placeholder="Search suppliers..."
+            placeholder="SEARCH..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded pl-10 pr-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
@@ -155,9 +155,9 @@ export default function Suppliers() {
                 });
                 setShowForm(true);
              }}
-             className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-500/10"
+             className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-500/10 font-black tracking-widest uppercase"
            >
-             <Plus className="w-3.5 h-3.5" /> Add Supplier
+             <Plus className="w-3.5 h-3.5" /> ADD
            </button>
         </div>
       </div>
@@ -169,14 +169,14 @@ export default function Suppliers() {
              </div>
         ) : (
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200">
+            <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200 text-[9px]">
               <tr className="text-slate-500 bg-slate-50/80 backdrop-blur-md transition-colors">
                 <th className="py-4 px-6 font-black border-r border-slate-200">ID</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Supplier Name</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Email</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Phone</th>
-                <th className="py-4 px-6 font-black text-right border-r border-slate-200">Balance</th>
-                <th className="py-4 px-6 font-black text-right">Actions</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">NAME</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">MAIL</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">TEL</th>
+                <th className="py-4 px-6 font-black text-right border-r border-slate-200">BAL</th>
+                <th className="py-4 px-6 font-black text-right">OP</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 transition-colors">
@@ -239,7 +239,7 @@ export default function Suppliers() {
            <div className="w-full max-w-lg bg-white border border-slate-200 shadow-2xl rounded-lg flex flex-col relative animate-in fade-in zoom-in-95 duration-200">
               <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
                 <h2 className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
-                  {formData.id ? 'Edit Supplier' : 'Add New Supplier'}
+                  {formData.id ? 'UPDATE' : 'CREATE'}
                 </h2>
                 <button 
                   onClick={() => setShowForm(false)}
@@ -252,75 +252,75 @@ export default function Suppliers() {
               <div className="p-6 bg-white overflow-y-auto max-h-[80vh]">
                 <form id="supplierForm" onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-[9px] text-slate-500 font-black tracking-widest">Supplier Name</label>
+                    <label className="text-[9px] text-slate-500 font-black tracking-widest uppercase">NAME</label>
                     <input 
                         type="text" required 
                         value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} 
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all font-black"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[9px] text-slate-500 font-black tracking-widest">Email Address</label>
+                    <label className="text-[9px] text-slate-500 font-black tracking-widest uppercase">MAIL</label>
                     <input 
                         type="text" 
                         value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} 
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all font-bold"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[9px] text-slate-500 font-black tracking-widest">Phone Number</label>
+                    <label className="text-[9px] text-slate-500 font-black tracking-widest uppercase">TEL</label>
                     <input 
                         type="text" 
                         value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} 
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all font-bold"
                     />
                   </div>
 
                   <div className="border-t border-slate-100 pt-4 mt-2 space-y-4">
-                    <h3 className="text-[9px] text-indigo-600 font-black tracking-widest uppercase">Banking Information</h3>
+                    <h3 className="text-[9px] text-indigo-600 font-black tracking-widest uppercase italic">BANK_DETAILS</h3>
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-[9px] text-slate-500 font-black tracking-widest">Bank Name</label>
+                        <label className="text-[9px] text-slate-500 font-black tracking-widest uppercase font-mono">BANK</label>
                         <input 
                             type="text" 
                             placeholder="e.g. Chase Bank"
                             value={formData.bank_name || ''} 
                             onChange={e => setFormData({...formData, bank_name: e.target.value})} 
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all text-[9.5px] uppercase"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all text-[9.5px] font-black uppercase"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[9px] text-slate-500 font-black tracking-widest">Account Name</label>
+                        <label className="text-[9px] text-slate-500 font-black tracking-widest uppercase font-mono">A/C_NAME</label>
                         <input 
                             type="text" 
                             placeholder="e.g. Acme Corp"
                             value={formData.bank_account_name || ''} 
                             onChange={e => setFormData({...formData, bank_account_name: e.target.value})} 
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all text-[9.5px] uppercase"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all text-[9.5px] font-black uppercase"
                         />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-[9px] text-slate-500 font-black tracking-widest">Account Number</label>
+                        <label className="text-[9px] text-slate-500 font-black tracking-widest uppercase font-mono">A/C_NO</label>
                         <input 
                             type="text" 
                             placeholder="e.g. 123456789"
                             value={formData.bank_account_no || ''} 
                             onChange={e => setFormData({...formData, bank_account_no: e.target.value})} 
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all text-[9.5px] uppercase"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all text-[9.5px] font-black uppercase"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[9px] text-slate-500 font-black tracking-widest">Routing / SWIFT</label>
+                        <label className="text-[9px] text-slate-500 font-black tracking-widest uppercase font-mono">CODE</label>
                         <input 
                             type="text" 
                             placeholder="e.g. TR0921"
                             value={formData.bank_routing_no || ''} 
                             onChange={e => setFormData({...formData, bank_routing_no: e.target.value})} 
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all text-[9.5px] uppercase"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition-all text-[9.5px] font-black uppercase"
                         />
                       </div>
                     </div>
@@ -333,9 +333,9 @@ export default function Suppliers() {
                   form="supplierForm"
                   type="submit" 
                   disabled={loading}
-                  className="px-6 py-2 bg-indigo-600 text-white font-black text-[10px] tracking-widest rounded hover:bg-indigo-700 transition-all disabled:opacity-50"
+                  className="px-8 py-2 bg-indigo-600 text-white font-black text-[10px] tracking-widest rounded hover:bg-indigo-700 transition-all disabled:opacity-50 uppercase shadow-lg shadow-indigo-500/20"
                 >
-                  {loading ? 'Saving...' : 'Save Supplier'}
+                  {loading ? 'SAVING...' : 'SAVE'}
                 </button>
               </div>
            </div>

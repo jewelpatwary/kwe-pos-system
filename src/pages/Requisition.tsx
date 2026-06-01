@@ -16,7 +16,7 @@ export default function Requisition() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filterType, setFilterType] = useState<'DUE' | 'PAID' | 'ALL'>('DUE');
+  const [filterStatuses, setFilterStatuses] = useState<string[]>(['DUE']);
   
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -35,7 +35,7 @@ export default function Requisition() {
       setInvoices([]);
       setSelectedInvoiceIds([]);
     }
-  }, [selectedSupplierId, filterType]);
+  }, [selectedSupplierId, filterStatuses]);
 
   const fetchSuppliers = async () => {
     try {
@@ -51,8 +51,8 @@ export default function Requisition() {
     setLoading(true);
     try {
       let url = `/api/admin/purchase-invoices?supplier_id=${selectedSupplierId}`;
-      if (filterType !== 'ALL') {
-        url += `&payment_status=${filterType === 'DUE' ? 'DUE' : 'PAID'}`;
+      if (filterStatuses.length > 0 && !filterStatuses.includes('ALL')) {
+        url += `&status_list=${filterStatuses.join(',')}`;
       }
       
       const res = await fetch(url, {
@@ -122,14 +122,27 @@ export default function Requisition() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-black text-slate-400 mb-1.5 tracking-widest uppercase">Payment Status</label>
-            <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200">
-              {(['DUE', 'PAID', 'ALL'] as const).map(type => (
+            <label className="block text-[10px] font-black text-slate-400 mb-1.5 tracking-widest uppercase">Multi-Status Filter</label>
+            <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200 gap-1">
+              {(['DUE', 'PAID', 'PARTIAL', 'ALL'] as const).map(type => (
                 <button
                   key={type}
-                  onClick={() => setFilterType(type)}
+                  onClick={() => {
+                    if (type === 'ALL') {
+                      setFilterStatuses(['ALL']);
+                      return;
+                    }
+                    setFilterStatuses(prev => {
+                      const withoutAll = prev.filter(s => s !== 'ALL');
+                      if (withoutAll.includes(type)) {
+                        const next = withoutAll.filter(s => s !== type);
+                        return next.length === 0 ? ['ALL'] : next;
+                      }
+                      return [...withoutAll, type];
+                    });
+                  }}
                   className={`px-4 py-1.5 rounded text-[9px] font-black tracking-widest transition-all ${
-                    filterType === type 
+                    filterStatuses.includes(type) 
                       ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' 
                       : 'text-slate-400 hover:text-slate-600'
                   }`}

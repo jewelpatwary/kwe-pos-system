@@ -8,6 +8,8 @@ import jwt from 'jsonwebtoken';
 import { db, initDB, seedProducts } from './src/server/db.js';
 import { getSupabase } from './src/lib/supabaseClient.js';
 
+import os from 'os';
+
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_pos_key_2026';
 
 // Global uncaught exception and unhandled promise rejection handlers to prevent process crash
@@ -20,18 +22,19 @@ process.on('uncaughtException', (error) => {
 });
 
 // --- DATA FILE CONFIGURATION ---
-// Use /tmp for serverless environments (Vercel) to avoid read-only filesystem errors,
-// although we are moving towards Supabase for all persistent storage.
-const DATA_DIR = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' 
-  ? path.join('/tmp', 'pos-data')
+// Use /tmp or os.tmpdir() for serverless environments (Vercel) to avoid read-only filesystem errors.
+// We are migrating towards Supabase for all persistent storage, so these local files are increasingly legacy.
+const isServerless = process.env.VERCEL === '1' || !!process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === 'production';
+const DATA_DIR = isServerless
+  ? path.join(os.tmpdir(), 'pos-data')
   : path.join(process.cwd(), 'src', 'server', 'data');
 
-if (!fs.existsSync(DATA_DIR)) {
-  try {
+try {
+  if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-  } catch (err) {
-    console.warn('Failed to create DATA_DIR, might be in a read-only environment:', err);
   }
+} catch (err) {
+  console.warn(`[DATA_DIR] Warning: Could not ensure directory exists at ${DATA_DIR}. This is expected in some read-only environments.`, err.message);
 }
 const CAT2_FILE = path.join(DATA_DIR, 'categories2.json');
 const PROD_CAT2_FILE = path.join(DATA_DIR, 'product_category2.json');
@@ -160,6 +163,101 @@ function writeExpenseCategories(data: any) {
   }
 }
 
+function readProductSalesType() {
+  try {
+    if (!fs.existsSync(PROD_SALES_TYPE_FILE)) {
+      try {
+        fs.writeFileSync(PROD_SALES_TYPE_FILE, JSON.stringify({}, null, 2));
+      } catch (e) {}
+      return {};
+    }
+    return JSON.parse(fs.readFileSync(PROD_SALES_TYPE_FILE, 'utf-8'));
+  } catch (e) { return {}; }
+}
+function writeProductSalesType(data: any) { 
+  try {
+    fs.writeFileSync(PROD_SALES_TYPE_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write ProductSalesType to local file:', e.message);
+  }
+}
+
+function readProductStatus() {
+  try {
+    if (!fs.existsSync(PROD_STATUS_FILE)) {
+      try {
+        fs.writeFileSync(PROD_STATUS_FILE, JSON.stringify({}, null, 2));
+      } catch (e) {}
+      return {};
+    }
+    return JSON.parse(fs.readFileSync(PROD_STATUS_FILE, 'utf-8'));
+  } catch (e) { return {}; }
+}
+function writeProductStatus(data: any) { 
+  try {
+    fs.writeFileSync(PROD_STATUS_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write ProductStatus to local file:', e.message);
+  }
+}
+
+function readCustomerAutoCreditProduct() {
+  try {
+    if (!fs.existsSync(PROD_AUTO_CREDIT_PRODUCT_FILE)) {
+      try {
+        fs.writeFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, JSON.stringify({}, null, 2));
+      } catch (e) {}
+      return {};
+    }
+    return JSON.parse(fs.readFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, 'utf-8'));
+  } catch (e) { return {}; }
+}
+function writeCustomerAutoCreditProduct(data: any) { 
+  try {
+    fs.writeFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write CustomerAutoCreditProduct to local file:', e.message);
+  }
+}
+
+function readCustomerMetadata() {
+  try {
+    if (!fs.existsSync(CUSTOMER_METADATA_FILE)) {
+      try {
+        fs.writeFileSync(CUSTOMER_METADATA_FILE, JSON.stringify({}, null, 2));
+      } catch (e) {}
+      return {};
+    }
+    return JSON.parse(fs.readFileSync(CUSTOMER_METADATA_FILE, 'utf-8'));
+  } catch (e) { return {}; }
+}
+function writeCustomerMetadata(data: any) { 
+  try {
+    fs.writeFileSync(CUSTOMER_METADATA_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write CustomerMetadata to local file:', e.message);
+  }
+}
+
+function readProductModified() {
+  try {
+    if (!fs.existsSync(PROD_MODIFIED_FILE)) {
+      try {
+        fs.writeFileSync(PROD_MODIFIED_FILE, JSON.stringify({}, null, 2));
+      } catch (e) {}
+      return {};
+    }
+    return JSON.parse(fs.readFileSync(PROD_MODIFIED_FILE, 'utf-8'));
+  } catch (e) { return {}; }
+}
+function writeProductModified(data: any) { 
+  try {
+    fs.writeFileSync(PROD_MODIFIED_FILE, JSON.stringify(data, null, 2)); 
+  } catch (e) {
+    console.warn('Failed to write ProductModified to local file:', e.message);
+  }
+}
+
 // Proxy supabase to implement lazy initialization
 const supabase = {
   from: (table: string) => getSupabase().from(table),
@@ -205,11 +303,10 @@ app.use(express.json({ limit: '50mb' }));
 // Initialize Database in the background synchronously to avoid blocking module import in serverless environments
 initDB();
 if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  // Safe check for seeded status - in Vercel we rely on Supabase settings only, 
-  // elsewhere we can use a local lock file for efficiency.
-  const isAlreadySeeded = process.env.VERCEL !== '1' ? fs.existsSync(SEED_LOCK_FILE) : true; 
-  // We pass true to skipMockData on Vercel to be safe, unless we really need it.
-  // Actually seedProducts handles Supabase setting too.
+  // Safe check for seeded status - we rely on the Supabase settings table internal check mostly.
+  // We use the local lock file only as an optimization to avoid unnecessary Supabase calls on local dev.
+  const isAlreadySeeded = process.env.VERCEL !== '1' && fs.existsSync(SEED_LOCK_FILE); 
+  
   seedProducts(isAlreadySeeded).then(() => {
     if (!isAlreadySeeded && process.env.VERCEL !== '1') {
       try {
@@ -1172,6 +1269,9 @@ app.post('/api/auth/login', async (req, res) => {
   app.put('/api/products/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { name, barcode, category_id, brand_id, unit_id, purchase_price, selling_price, stock_quantity, supplier_id, expiry_enabled, expiry_date, category2_id, sales_type, status, is_favorite, is_credit_allowed } = req.body;
+    
+    console.log(`Updating product ${id}. is_credit_allowed in body:`, is_credit_allowed);
+
     try {
       const { data, error } = await supabase
         .from('products')
@@ -1194,7 +1294,7 @@ app.post('/api/auth/login', async (req, res) => {
         .select();
 
       if (error) throw error;
-
+      console.log(`Product ${id} updated successfully. is_credit_allowed saved:`, data?.[0]?.is_credit_allowed);
       const mappings = readProductCategory2();
       if (category2_id) {
         mappings[id.toString()] = category2_id.toString();
@@ -1536,85 +1636,6 @@ app.post('/api/auth/login', async (req, res) => {
   });
 
   // --- Category 2 Local Emulators (Already defined at top) ---
-  function readProductSalesType() {
-    if (!fs.existsSync(PROD_SALES_TYPE_FILE)) {
-      fs.writeFileSync(PROD_SALES_TYPE_FILE, JSON.stringify({}, null, 2));
-      return {};
-    }
-    try {
-      return JSON.parse(fs.readFileSync(PROD_SALES_TYPE_FILE, 'utf-8'));
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function writeProductSalesType(data: any) {
-    fs.writeFileSync(PROD_SALES_TYPE_FILE, JSON.stringify(data, null, 2));
-  }
-
-  function readProductStatus() {
-    if (!fs.existsSync(PROD_STATUS_FILE)) {
-      fs.writeFileSync(PROD_STATUS_FILE, JSON.stringify({}, null, 2));
-      return {};
-    }
-    try {
-      return JSON.parse(fs.readFileSync(PROD_STATUS_FILE, 'utf-8'));
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function writeProductStatus(data: any) {
-    fs.writeFileSync(PROD_STATUS_FILE, JSON.stringify(data, null, 2));
-  }
-
-  function readCustomerAutoCreditProduct() {
-    if (!fs.existsSync(PROD_AUTO_CREDIT_PRODUCT_FILE)) {
-      fs.writeFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, JSON.stringify({}, null, 2));
-      return {};
-    }
-    try {
-      return JSON.parse(fs.readFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, 'utf-8'));
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function writeCustomerAutoCreditProduct(data: any) {
-    fs.writeFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, JSON.stringify(data, null, 2));
-  }
-
-  function readCustomerMetadata() {
-    if (!fs.existsSync(CUSTOMER_METADATA_FILE)) {
-      fs.writeFileSync(CUSTOMER_METADATA_FILE, JSON.stringify({}, null, 2));
-      return {};
-    }
-    try {
-      return JSON.parse(fs.readFileSync(CUSTOMER_METADATA_FILE, 'utf-8'));
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function writeCustomerMetadata(data: any) {
-    fs.writeFileSync(CUSTOMER_METADATA_FILE, JSON.stringify(data, null, 2));
-  }
-
-  function readProductModified() {
-    if (!fs.existsSync(PROD_MODIFIED_FILE)) {
-      fs.writeFileSync(PROD_MODIFIED_FILE, JSON.stringify({}, null, 2));
-      return {};
-    }
-    try {
-      return JSON.parse(fs.readFileSync(PROD_MODIFIED_FILE, 'utf-8'));
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function writeProductModified(data: any) {
-    fs.writeFileSync(PROD_MODIFIED_FILE, JSON.stringify(data, null, 2));
-  }
 
   // Categories 2 Endpoints
   app.get('/api/categories2', async (req, res) => {
@@ -2655,7 +2676,7 @@ app.post('/api/auth/login', async (req, res) => {
           const realSales = (yesterdaySales || []).filter(s => ['CASH', 'CREDIT'].includes(s.payment_method)).reduce((sum, s) => sum + s.total_amount, 0);
           const creditSales = (yesterdaySales || []).filter(s => s.payment_method === 'CREDIT').reduce((sum, s) => sum + s.total_amount, 0);
           const autoBurnSales = (yesterdaySales || []).filter(s => s.payment_method === 'AUTO_BURN').reduce((sum, s) => sum + s.total_amount, 0);
-          const onlineSales = (yesterdaySales || []).filter(s => s.payment_method === 'ONLINE').reduce((sum, s) => sum + s.total_amount, 0);
+          const onlineSales = (yesterdaySales || []).filter(s => s.payment_method === 'ONLINE' || s.payment_method === 'TNG').reduce((sum, s) => sum + s.total_amount, 0);
 
           await supabase.from('sales_summary_logs').upsert([{
             date: yesterday,
@@ -2846,7 +2867,6 @@ app.post('/api/auth/login', async (req, res) => {
           products!inner(name, barcode, categories(name))
         `)
         .eq('sales.status', 'completed')
-        .neq('sales.payment_method', 'AUTO_BURN')
         .filter('sales.created_at', 'gte', `${targetDate}T00:00:00`)
         .filter('sales.created_at', 'lte', `${targetDate}T23:59:59`);
 
@@ -2886,17 +2906,20 @@ app.post('/api/auth/login', async (req, res) => {
         totalCredit: 0,
         totalCash: 0,
         totalOnline: 0,
-        totalAutoBurn: 0
+        totalTNG: 0,
+        totalAutoBurn: 0,
+        transactionCount: (summaryData || []).length
       };
 
       (summaryData || []).forEach((s: any) => {
         if (s.payment_method === 'CREDIT') summary.totalCredit += s.total_amount;
         else if (s.payment_method === 'CASH') summary.totalCash += s.total_amount;
+        else if (s.payment_method === 'TNG') summary.totalTNG += s.total_amount;
         else if (s.payment_method === 'ONLINE') summary.totalOnline += s.total_amount;
         else if (s.payment_method === 'AUTO_BURN') summary.totalAutoBurn += s.total_amount;
       });
 
-      summary.grandTotal = summary.totalCredit + summary.totalCash + summary.totalOnline + summary.totalAutoBurn;
+      summary.grandTotal = summary.totalCredit + summary.totalCash + summary.totalOnline + summary.totalTNG + summary.totalAutoBurn;
 
       res.json({
         success: true,
@@ -3506,10 +3529,10 @@ app.post('/api/auth/login', async (req, res) => {
       const itemDetails = Object.values(itemMap).sort((a: any, b: any) => b.total_value - a.total_value).slice(0, 50);
 
       const summary = {
-        totalReal: stats.filter(s => ['CASH', 'CREDIT', 'ONLINE'].includes(s.payment_method)).reduce((acc, s) => acc + s.total, 0),
+        totalReal: stats.filter(s => ['CASH', 'CREDIT', 'ONLINE', 'TNG'].includes(s.payment_method)).reduce((acc, s) => acc + s.total, 0),
         totalCredit: stats.find(s => s.payment_method === 'CREDIT')?.total || 0,
         totalAutoBurn: stats.find(s => s.payment_method === 'AUTO_BURN')?.total || 0,
-        totalOnline: stats.find(s => s.payment_method === 'ONLINE')?.total || 0,
+        totalOnline: stats.filter(s => s.payment_method === 'ONLINE' || s.payment_method === 'TNG').reduce((acc, s) => acc + s.total, 0),
         totalCash: stats.find(s => s.payment_method === 'CASH')?.total || 0,
         grandTotal: stats.reduce((acc, s) => acc + s.total, 0)
       };
@@ -3572,7 +3595,7 @@ app.post('/api/auth/login', async (req, res) => {
           product_name: item.products?.name,
           qty_sold: item.quantity,
           cash_amount: item.sales.payment_method === 'CASH' ? item.subtotal : 0,
-          online_amount: item.sales.payment_method === 'ONLINE' ? item.subtotal : 0,
+          online_amount: (item.sales.payment_method === 'ONLINE' || item.sales.payment_method === 'TNG') ? item.subtotal : 0,
           credit_amount: item.sales.payment_method === 'CREDIT' ? item.subtotal : 0,
           auto_burn_amount: item.sales.payment_method === 'AUTO_BURN' ? item.subtotal : 0,
           total_amount: item.subtotal
@@ -3722,10 +3745,10 @@ app.post('/api/auth/login', async (req, res) => {
       };
 
       (sales || []).forEach(s => {
-        if (['CASH', 'CREDIT', 'ONLINE'].includes(s.payment_method)) summary.todayReal += s.total_amount;
+        if (['CASH', 'CREDIT', 'ONLINE', 'TNG'].includes(s.payment_method)) summary.todayReal += s.total_amount;
         if (s.payment_method === 'CREDIT') summary.todayCredit += s.total_amount;
         if (s.payment_method === 'AUTO_BURN') summary.todayAutoBurn += s.total_amount;
-        if (s.payment_method === 'ONLINE') summary.todayOnline += s.total_amount;
+        if (s.payment_method === 'ONLINE' || s.payment_method === 'TNG') summary.todayOnline += s.total_amount;
       });
 
       summary.todayProfit = (profitData || []).reduce((sum, item: any) => {
@@ -3866,17 +3889,31 @@ app.post('/api/auth/login', async (req, res) => {
   app.post('/api/admin/inventory/sessions', authenticateToken, requireAdmin, async (req: any, res) => {
     try {
       const today = new Date().toISOString().split('T')[0];
+      console.log(`[INVENTORY] Creating new session. User ID: ${req.user.id}, Date: ${today}`);
+      
       const { data, error } = await supabase
         .from('inventory_sessions')
-        .insert([{ date: today, created_by: req.user.id, status: 'DRAFT' }])
+        .insert([{ 
+          date: today, 
+          created_by: req.user.id, 
+          status: 'DRAFT',
+          total_system_value: 0,
+          total_physical_value: 0,
+          total_difference: 0
+        }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase inventory_sessions insert error:', error);
+        throw error;
+      }
+      
+      console.log(`[INVENTORY] Session created successfully. ID: ${data?.id}`);
       res.json({ success: true, id: data.id });
     } catch (error: any) {
-      console.error('Supabase create inventory session error:', error);
-      res.status(500).json({ success: false, message: error.message });
+      console.error('Supabase create inventory session detailed error:', error);
+      res.status(500).json({ success: false, message: error.message || 'Unknown database error' });
     }
   });
 
@@ -4056,11 +4093,18 @@ app.post('/api/auth/login', async (req, res) => {
   // --- Purchase Invoice APIs ---
   app.get('/api/admin/purchase-invoices', authenticateToken, requireAdmin, async (req, res) => {
     try {
-      const { supplier_id, payment_status, search } = req.query;
+      const { supplier_id, payment_status, status_list, search } = req.query;
       let query = supabase.from('purchase_invoices').select('*, suppliers!inner(name)');
 
       if (supplier_id) query = query.eq('supplier_id', supplier_id);
-      if (payment_status) query = query.eq('payment_status', payment_status);
+      
+      if (status_list) {
+        const statuses = (status_list as string).split(',');
+        query = query.in('payment_status', statuses);
+      } else if (payment_status) {
+        query = query.eq('payment_status', payment_status);
+      }
+      
       if (search) query = query.or(`invoice_number.ilike.%${search}%,suppliers.name.ilike.%${search}%`);
 
       const { data, error } = await query.order('date', { ascending: false });
@@ -5019,7 +5063,9 @@ app.post('/api/auth/login', async (req, res) => {
 
         // Ensure seed lock exists so it doesn't re-seed mock data
         if (!fs.existsSync(SEED_LOCK_FILE)) {
-          fs.writeFileSync(SEED_LOCK_FILE, 'Reset performed at ' + new Date().toISOString());
+          try {
+            fs.writeFileSync(SEED_LOCK_FILE, 'Reset performed at ' + new Date().toISOString());
+          } catch (e) {}
         }
 
         // Persistently flag database as seeded/reset in Supabase settings table so restart won't inject mock data

@@ -879,10 +879,11 @@ export default function POS() {
                 id="barcode-scanner"
                 ref={barcodeInputRef}
                 type="text"
+                inputMode="none"
                 placeholder="Barcode..."
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                className={`w-full bg-white border rounded pl-9 pr-3 py-2.5 text-[11px] font-black transition-all ${scanMode === 'PRICE_CHECK' ? 'border-emerald-500/50 text-emerald-600 ' : 'border-indigo-500/50 text-indigo-600 '}`}
+                className={`w-full bg-white border rounded pl-9 pr-3 py-2.5 text-[11px] font-black transition-all caret-transparent ${scanMode === 'PRICE_CHECK' ? 'border-emerald-500/50 text-emerald-600 ' : 'border-indigo-500/50 text-indigo-600 '}`}
               />
             </form>
           </div>
@@ -993,10 +994,11 @@ export default function POS() {
                     id="price-check-search"
                     autoFocus
                     type="text" 
+                    inputMode="none"
                     placeholder="Scan or type barcode..."
                     value={priceCheckSearch}
                     onChange={(e) => setPriceCheckSearch(e.target.value)}
-                    className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 text-slate-900 text-[12px] font-black rounded outline-none focus:ring-1 focus:ring-indigo-500 italic transition-all shadow-inner"
+                    className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 text-slate-900 text-[12px] font-black rounded outline-none focus:ring-1 focus:ring-indigo-500 italic transition-all shadow-inner caret-transparent"
                   />
                 </div>
 

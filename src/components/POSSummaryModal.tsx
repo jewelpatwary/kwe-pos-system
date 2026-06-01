@@ -21,7 +21,9 @@ interface SummaryTotals {
   totalCredit: number;
   totalCash: number;
   totalOnline: number;
+  totalTNG: number;
   totalAutoBurn: number;
+  transactionCount: number;
 }
 
 export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
@@ -100,13 +102,14 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
             </div>
             <div>
               <h2 className="font-black text-slate-900 tracking-widest uppercase text-sm">DAILY_SALES_SUMMARY</h2>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-3 mt-1">
                  <input 
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
                     className="p-1 border border-slate-300 rounded text-[9px] font-black uppercase text-slate-600 outline-none focus:ring-1 focus:ring-indigo-500"
                  />
+                 <span className="text-[10px] font-black text-indigo-600">{currency.symbol}{summary?.grandTotal.toFixed(2)}</span>
                  <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">• {storeProfile?.shop_name || 'POS_STATION_ALPHA'}</span>
               </div>
             </div>
@@ -203,14 +206,24 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
                       <span className="font-black text-indigo-600">{currency.symbol}{summary?.totalCredit.toFixed(2)}</span>
                    </div>
                    
+                   <div className="flex justify-between items-center py-2 px-3 opacity-80 border-b border-slate-100 italic">
+                      <span className="font-black tracking-[0.2em] uppercase text-[9px]">Transactions</span>
+                      <span className="font-bold">{summary?.transactionCount || 0}</span>
+                   </div>
+                   
                    <div className="flex justify-between items-center py-2 px-3 opacity-80">
                       <span className="font-black tracking-[0.2em] uppercase text-[9px]">Cash Volume</span>
                       <span className="font-bold">{currency.symbol}{summary?.totalCash.toFixed(2)}</span>
                    </div>
                    
-                   <div className="flex justify-between items-center py-2 px-3 opacity-80">
-                      <span className="font-black tracking-[0.2em] uppercase text-[9px]">TNG</span>
-                      <span className="font-bold">{currency.symbol}{summary?.totalOnline.toFixed(2)}</span>
+                   <div className="flex justify-between items-center py-2 px-3 bg-blue-50 border border-blue-100 rounded my-1">
+                      <span className="font-black tracking-[0.2em] uppercase text-[9px] text-blue-700">ONLINE (Bank/Other)</span>
+                      <span className="font-black text-blue-700">{currency.symbol}{summary?.totalOnline.toFixed(2)}</span>
+                   </div>
+
+                   <div className="flex justify-between items-center py-2 px-3 bg-indigo-50 border border-indigo-100 rounded my-1">
+                      <span className="font-black tracking-[0.2em] uppercase text-[9px] text-indigo-700">TNG (E-Wallet)</span>
+                      <span className="font-black text-indigo-700">{currency.symbol}{summary?.totalTNG.toFixed(2)}</span>
                    </div>
 
                    <div className="flex justify-between items-center py-2 px-3 bg-orange-50 rounded border border-orange-100">
@@ -222,11 +235,13 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
                    </div>
                 </div>
 
-                <div className="flex justify-between items-center text-lg font-black uppercase mt-4 pt-4 border-t-2 border-slate-900">
-                  <span>Grand Total</span>
-                  <div className="flex gap-12">
-                     <span className="w-8 text-right">{data.reduce((sum, i) => sum + i.qty, 0)}</span>
-                     <span className="w-16 text-right underline underline-offset-4">{currency.symbol}{summary?.grandTotal.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-lg font-black uppercase mt-4 pt-4 border-t-2 border-slate-900 bg-slate-50 p-4 rounded-lg">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-500 tracking-widest">Grand Total</span>
+                    <span className="text-[9px] text-indigo-600 tracking-tighter">Total Items Sold: {data.reduce((sum, i) => sum + i.qty, 0)}</span>
+                  </div>
+                  <div className="text-2xl tracking-tighter underline underline-offset-4 decoration-double">
+                     {currency.symbol}{summary?.grandTotal.toFixed(2)}
                   </div>
                 </div>
 

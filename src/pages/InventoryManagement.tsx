@@ -52,13 +52,18 @@ export default function InventoryManagement() {
     try {
       const res = await fetch('/api/admin/inventory/sessions', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       const data = await res.json();
       if (data.success) {
         fetchSessionDetails(data.id);
+      } else {
+        alert(data.message || 'Error creating session');
       }
-    } catch (err) { alert('Error creating session'); }
+    } catch (err) { alert('Error connecting to server'); }
     finally { setLoading(false); }
   };
 

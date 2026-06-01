@@ -118,28 +118,32 @@ export default function ProductManagement() {
       const url = formData.id ? `/api/products/${formData.id}` : '/api/products';
       const method = formData.id ? 'PUT' : 'POST';
 
+      const payload = {
+        ...formData,
+        purchase_price: Number(formData.purchase_price),
+        selling_price: Number(formData.selling_price),
+        stock_quantity: Number(formData.stock_quantity),
+        supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
+        category_id: formData.category_id ? Number(formData.category_id) : null,
+        category2_id: formData.category2_id ? Number(formData.category2_id) : null,
+        brand_id: formData.brand_id ? Number(formData.brand_id) : null,
+        unit_id: formData.unit_id ? Number(formData.unit_id) : null,
+        is_credit_allowed: Boolean(formData.is_credit_allowed),
+        expiry_enabled: formData.expiry_enabled ? 1 : 0,
+        is_favorite: !!formData.is_favorite,
+        status: formData.status,
+        expiry_date: formData.expiry_date || null
+      };
+
+      console.log('Saving product with payload:', payload);
+
       const res = await fetch(url, {
         method,
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          ...formData,
-          purchase_price: Number(formData.purchase_price),
-          selling_price: Number(formData.selling_price),
-          stock_quantity: Number(formData.stock_quantity),
-          supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
-          category_id: formData.category_id ? Number(formData.category_id) : null,
-          category2_id: formData.category2_id ? Number(formData.category2_id) : null,
-          brand_id: formData.brand_id ? Number(formData.brand_id) : null,
-          unit_id: formData.unit_id ? Number(formData.unit_id) : null,
-          is_credit_allowed: !!formData.is_credit_allowed,
-          expiry_enabled: formData.expiry_enabled ? 1 : 0,
-          is_favorite: !!formData.is_favorite,
-          status: formData.status,
-          expiry_date: formData.expiry_date || null
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json();
@@ -373,7 +377,7 @@ export default function ProductManagement() {
                     {/* Seq 1 & 2: Product Name & Barcode */}
                     <div className="grid grid-cols-2 gap-8">
                         <div className="space-y-1">
-                            <label className="text-slate-400 font-black tracking-widest">Product Name</label>
+                            <label className="text-slate-400 font-black tracking-widest text-[9px]">NAME</label>
                             <input 
                                 type="text" required 
                                 value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} 
@@ -381,7 +385,7 @@ export default function ProductManagement() {
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-slate-400 font-black tracking-widest">Barcode</label>
+                            <label className="text-slate-400 font-black tracking-widest text-[9px]">CODE</label>
                             <input 
                                 type="text" required 
                                 value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} 
@@ -393,16 +397,16 @@ export default function ProductManagement() {
                     {/* Seq 3 & 7: Category & Category 2 */}
                     <div className="grid grid-cols-2 gap-8">
                         <div className="space-y-1">
-                            <label className="text-slate-400 font-black tracking-widest">Category</label>
+                            <label className="text-slate-400 font-black tracking-widest text-[9px]">CAT</label>
                             <select 
                                 required value={formData.category_id} 
                                 onChange={e => {
                                     const selectedId = e.target.value;
                                     setFormData({...formData, category_id: selectedId});
                                 }} 
-                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm h-[46px]"
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm h-[46px] font-black"
                             >
-                                <option value="">Select Category</option>
+                                <option value="">SELECT...</option>
                                 {categories.map(cat => (
                                     <option key={cat.id} value={cat.id}>
                                         {cat.name}
@@ -412,16 +416,16 @@ export default function ProductManagement() {
                         </div>
 
                         <div className="space-y-1">
-                            <label className="text-slate-400 font-black tracking-widest">Category 2</label>
+                            <label className="text-slate-400 font-black tracking-widest text-[9px]">CAT2</label>
                             <select 
                                 value={formData.category2_id} 
                                 onChange={e => {
                                     const selectedId = e.target.value;
                                     setFormData({...formData, category2_id: selectedId});
                                 }} 
-                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm h-[46px]"
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm h-[46px] font-black"
                             >
-                                <option value="">Select Category 2</option>
+                                <option value="">SELECT...</option>
                                 {categories2.map(cat => (
                                     <option key={cat.id} value={cat.id}>
                                         {cat.name}
@@ -434,7 +438,7 @@ export default function ProductManagement() {
                     {/* Seq 5, 6 & 7: Buying Price, Seals Price & Stock */}
                     <div className="grid grid-cols-3 gap-8 p-6 bg-slate-50 border border-slate-200 rounded">
                         <div className="space-y-1">
-                            <label className="text-slate-400 font-black tracking-widest">Buying Price</label>
+                            <label className="text-slate-400 font-black tracking-widest text-[9px]">BUY</label>
                             <input 
                                 type="number" step="0.01" required 
                                 value={formData.purchase_price} onChange={e => setFormData({...formData, purchase_price: e.target.value})} 
@@ -442,7 +446,7 @@ export default function ProductManagement() {
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-indigo-600 font-black tracking-widest italic">Seals Price</label>
+                            <label className="text-indigo-600 font-black tracking-widest italic text-[9px]">SELL</label>
                             <input 
                                 type="number" step="0.01" required 
                                 value={formData.selling_price} onChange={e => setFormData({...formData, selling_price: e.target.value})} 
@@ -450,7 +454,7 @@ export default function ProductManagement() {
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-emerald-600 font-black tracking-widest">Current Stock</label>
+                            <label className="text-emerald-600 font-black tracking-widest text-[9px]">STOCK</label>
                             <input 
                                 type="number" required 
                                 value={formData.stock_quantity} onChange={e => setFormData({...formData, stock_quantity: e.target.value})} 
@@ -463,10 +467,10 @@ export default function ProductManagement() {
                     <div className="grid grid-cols-2 gap-8">
                         <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded hover:border-indigo-300 transition-all cursor-pointer group shadow-sm">
                             <input type="checkbox" id="expiry" checked={formData.expiry_enabled} onChange={e => setFormData({...formData, expiry_enabled: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                            <label htmlFor="expiry" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900">Track Expiry</label>
+                            <label htmlFor="expiry" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900 text-[9px]">EXP_ON</label>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-slate-400 font-black tracking-widest">Expiry Date</label>
+                            <label className="text-slate-400 font-black tracking-widest text-[9px]">EXP_DATE</label>
                             <input 
                                 type="date" 
                                 value={formData.expiry_date} onChange={e => setFormData({...formData, expiry_date: e.target.value})} 
@@ -479,24 +483,24 @@ export default function ProductManagement() {
                     <div className="grid grid-cols-2 gap-8 pt-4 border-t border-slate-200">
                         <div className="space-y-4">
                             <div className="space-y-1">
-                                <label className="text-slate-400 font-black tracking-widest">Unit</label>
+                                <label className="text-slate-400 font-black tracking-widest text-[9px]">UNIT</label>
                                 <select 
                                     required value={formData.unit_id} 
                                     onChange={e => setFormData({...formData, unit_id: e.target.value})} 
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm"
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm font-black"
                                 >
-                                    <option value="">Select Unit</option>
+                                    <option value="">SELECT...</option>
                                     {units.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
                                 </select>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-slate-400 font-black tracking-widest">Brand</label>
+                                <label className="text-slate-400 font-black tracking-widest text-[9px]">BRAND</label>
                                 <select 
                                     value={formData.brand_id} 
                                     onChange={e => setFormData({...formData, brand_id: e.target.value})} 
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm"
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm font-black"
                                 >
-                                    <option value="">Generic Brand</option>
+                                    <option value="">GENERIC</option>
                                     {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
                                 </select>
                             </div>
@@ -505,22 +509,22 @@ export default function ProductManagement() {
                         <div className="flex flex-col justify-center gap-4">
                             <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded hover:border-indigo-300 transition-all cursor-pointer group shadow-sm">
                                 <input type="checkbox" id="fav" checked={formData.is_favorite} onChange={e => setFormData({...formData, is_favorite: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                                <label htmlFor="fav" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900">Featured</label>
+                                <label htmlFor="fav" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900 text-[9px]">FAV</label>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-slate-400 font-black tracking-widest">Status</label>
+                                <label className="text-slate-400 font-black tracking-widest text-[9px]">STATUS</label>
                                 <select 
                                     value={formData.status} 
                                     onChange={e => setFormData({...formData, status: e.target.value})} 
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm"
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded outline-none shadow-sm font-black"
                                 >
-                                    <option value="active">Active</option>
-                                    <option value="deactive">Deactive</option>
+                                    <option value="active">ACTIVE</option>
+                                    <option value="deactive">DEACTIVE</option>
                                 </select>
                              </div>
                             <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded hover:border-indigo-300 transition-all cursor-pointer group shadow-sm">
                                 <input type="checkbox" id="credit" checked={formData.is_credit_allowed} onChange={e => setFormData({...formData, is_credit_allowed: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                                <label htmlFor="credit" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900">Allow Credit</label>
+                                <label htmlFor="credit" className="text-slate-500 font-black tracking-widest cursor-pointer group-hover:text-slate-900 text-[9px]">CREDIT</label>
                             </div>
                         </div>
                     </div>
@@ -529,7 +533,7 @@ export default function ProductManagement() {
                          <button 
                             type="submit" 
                             disabled={loading}
-                            className="px-12 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs tracking-widest uppercase italic shadow-sm">{isEditing ? 'Save Changes' : 'Save Product'}</button>
+                            className="px-12 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] tracking-widest uppercase italic shadow-sm rounded">{isEditing ? 'SAVE_CHANGES' : 'SAVE_PRODUCT'}</button>
                     </div>
                 </form>
             </div>
@@ -550,7 +554,7 @@ export default function ProductManagement() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input 
             type="text"
-            placeholder="Search name or barcode..."
+            placeholder="SEARCH..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded pl-10 pr-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
@@ -562,7 +566,7 @@ export default function ProductManagement() {
           onChange={(e) => setSelectedCategory(e.target.value)}
           className="bg-white border border-slate-200 text-slate-750 text-[9px] font-black rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm h-[33px]"
         >
-          <option value="all">All Categories</option>
+          <option value="all">CAT: ALL</option>
           {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
         </select>
 
@@ -571,7 +575,7 @@ export default function ProductManagement() {
           onChange={(e) => setSelectedCategory2(e.target.value)}
           className="bg-white border border-slate-200 text-slate-755 text-[9px] font-black rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm h-[33px]"
         >
-          <option value="all">All Categories 2</option>
+          <option value="all">CAT2: ALL</option>
           {categories2.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
         </select>
 
@@ -580,9 +584,9 @@ export default function ProductManagement() {
           onChange={(e) => setSelectedStatus(e.target.value)}
           className="bg-white border border-slate-200 text-slate-755 text-[9px] font-black rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm h-[33px]"
         >
-          <option value="all">All Status</option>
-          <option value="active">Active Only</option>
-          <option value="deactive">Deactive Only</option>
+          <option value="all">STATUS: ALL</option>
+          <option value="active">ACTIVE</option>
+          <option value="deactive">DEACTIVE</option>
         </select>
 
         <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded px-2.5 shadow-sm h-[33px]">
@@ -590,12 +594,12 @@ export default function ProductManagement() {
           <select 
             value={sortBy} 
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-transparent border-none text-slate-900 text-[9px] font-black outline-none cursor-pointer py-1.5 pr-2 focus:ring-0"
+            className="bg-transparent border-none text-slate-900 text-[9px] font-black outline-none cursor-pointer py-1.5 pr-2 focus:ring-0 uppercase"
           >
             <option value="name_asc">A-Z</option>
             <option value="name_desc">Z-A</option>
-            <option value="modified_desc">Last modified (Top)</option>
-            <option value="modified_asc">Last modified (Last)</option>
+            <option value="modified_desc">LATEST</option>
+            <option value="modified_asc">OLDEST</option>
           </select>
         </div>
         
@@ -604,7 +608,7 @@ export default function ProductManagement() {
                 onClick={() => setShowImportModal(true)}
                 className="bg-slate-100 border border-slate-200 text-slate-600 px-3 py-2 rounded hover:bg-slate-200 transition flex items-center gap-2 shadow-sm"
             >
-                <UploadCloud className="w-3.5 h-3.5" /> Bulk Import
+                <UploadCloud className="w-3.5 h-3.5" /> BULK
             </button>
             <button 
                 onClick={() => {
@@ -612,9 +616,9 @@ export default function ProductManagement() {
                    resetForm();
                    setShowForm(true);
                 }}
-                className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-500/10"
+                className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-500/10 font-black uppercase"
             >
-                <Plus className="w-3.5 h-3.5" /> Add Product
+                <Plus className="w-3.5 h-3.5" /> ADD
             </button>
         </div>
       </div>
@@ -626,20 +630,20 @@ export default function ProductManagement() {
              </div>
         ) : (
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200">
+            <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200 text-[9px]">
               <tr className="text-slate-500 bg-slate-50/80 backdrop-blur-md transition-colors">
-                <th className="py-4 px-6 font-black border-r border-slate-200">Product Name</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Barcode</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Category</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Category 2</th>
-                <th className="py-4 px-6 font-black text-right border-r border-slate-200">Buying Price</th>
-                <th className="py-4 px-6 font-black text-right border-r border-slate-200">Seals Price</th>
-                <th className="py-4 px-6 font-black text-center border-r border-slate-200">Stock</th>
-                <th className="py-4 px-6 font-black text-center border-r border-slate-200">Unit</th>
-                <th className="py-4 px-6 font-black text-center border-r border-slate-200">Brand</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">Expiry Date</th>
-                <th className="py-4 px-6 font-black border-r border-slate-200">Status</th>
-                <th className="py-4 px-6 font-black text-right">Action</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">NAME</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">CODE</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">CAT</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">CAT2</th>
+                <th className="py-4 px-6 font-black text-right border-r border-slate-200">BUY</th>
+                <th className="py-4 px-6 font-black text-right border-r border-slate-200">SELL</th>
+                <th className="py-4 px-6 font-black text-center border-r border-slate-200">STOCK</th>
+                <th className="py-4 px-6 font-black text-center border-r border-slate-200">UNIT</th>
+                <th className="py-4 px-6 font-black text-center border-r border-slate-200">BRAND</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200 text-center">EXP</th>
+                <th className="py-4 px-6 font-black border-r border-slate-200">STATUS</th>
+                <th className="py-4 px-6 font-black text-right">OP</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 transition-colors">
