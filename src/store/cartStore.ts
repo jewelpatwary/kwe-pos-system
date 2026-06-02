@@ -4,16 +4,24 @@ export interface Product {
   id: number;
   name: string;
   barcode: string;
+  sku?: string;
   category: string;
   brand: string;
+  brand_name?: string;
   unit?: string;
+  unit_name?: string;
+  category_id?: number;
+  category_name?: string;
+  category2_id?: number;
+  category2_name?: string;
   selling_price: number;
+  purchase_price: number;
   stock_quantity: number;
   is_credit_allowed?: number;
   is_favorite?: number;
   image_url?: string;
-  category_id?: number;
-  category_name?: string;
+  status?: string;
+  expiry_date?: string;
 }
 
 export interface CartItem extends Product {

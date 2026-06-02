@@ -296,7 +296,7 @@ export default function SupplierReturns() {
               
 
               <div className="mt-auto pt-8 text-center text-[7px] font-black text-slate-300 tracking-[0.4em] uppercase select-none">
-                INTEGRATED_BUFFER_SYSTEM_OVR
+                System Auto-Save Enabled
               </div>
             </div>
 
@@ -304,33 +304,33 @@ export default function SupplierReturns() {
             <div className="flex-1 flex flex-col bg-white transition-colors">
               <div className="p-3 bg-slate-50 border-b border-slate-200 flex gap-4 transition-colors">
                 <div className="flex-1 space-y-1">
-                  <label className="text-[8px] text-slate-400 font-black tracking-widest italic uppercase">TARGET_VENDOR</label>
+                  <label className="text-[8px] text-slate-400 font-black tracking-widest italic uppercase">Supplier Selection</label>
                   <select 
                     value={selectedSupplierId}
                     onChange={e => setSelectedSupplierId(e.target.value ? Number(e.target.value) : '')}
                     className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-inner"
                   >
-                    <option value="">NULL_VENDOR_SELECT</option>
+                    <option value="">Select Supplier...</option>
                     {suppliers.map(s => <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>)}
                   </select>
                 </div>
                 <div className="flex-1 space-y-1">
-                  <label className="text-[8px] text-slate-400 font-black tracking-widest italic uppercase">FAULT_CLASSIFCATION</label>
+                  <label className="text-[8px] text-slate-400 font-black tracking-widest italic uppercase">Return Classification</label>
                   <select 
                     value={returnType}
                     onChange={e => setReturnType(e.target.value)}
                     className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-inner"
                   >
-                    <option value="Damage Return">DAMAGE_LOG_PHYSICAL</option>
-                    <option value="Expiry Return">EXPIRY_TIMEOUT</option>
-                    <option value="Supplier Mistake">VENDOR_DATA_ERR</option>
+                    <option value="Damage Return">Physical Damage</option>
+                    <option value="Expiry Return">Expired Timeout</option>
+                    <option value="Supplier Mistake">Supplier Shipping Mistake</option>
                   </select>
                 </div>
                 <div className="flex-1 space-y-1">
-                  <label className="text-[8px] text-slate-400 font-black tracking-widest italic uppercase">DOCUMENT_REF/ID</label>
+                  <label className="text-[8px] text-slate-400 font-black tracking-widest italic uppercase">Document Reference / Invoice ID</label>
                   <input 
                     type="text" 
-                    placeholder="REFE_DOC_TRACE..." 
+                    placeholder="Ref. Document/Trace..." 
                     value={documentRef}
                     onChange={e => setDocumentRef(e.target.value)}
                     className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-inner"
@@ -342,8 +342,8 @@ export default function SupplierReturns() {
                 {returnItems.length === 0 ? (
                   <div className="py-20 text-center text-slate-300 flex flex-col items-center select-none grayscale opacity-60">
                     <Undo2 className="w-16 h-16 mb-4 opacity-10" />
-                    <p className="font-black tracking-[0.4em] text-xl uppercase">BUFFER_EMPTY</p>
-                    <p className="text-[8px] font-black italic mt-2 opacity-60 tracking-tighter uppercase">Select assets from registry to begin withdrawal</p>
+                    <p className="font-black tracking-[0.4em] text-xl uppercase">Buffer Empty</p>
+                    <p className="text-[8px] font-black italic mt-2 opacity-60 tracking-tighter uppercase">Select products from list to begin</p>
                   </div>
                 ) : (
                   returnItems.map(item => (
@@ -351,7 +351,7 @@ export default function SupplierReturns() {
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <div className="font-black text-slate-900 italic tracking-tighter text-[11px] leading-tight uppercase underline underline-offset-4 decoration-indigo-500/30 decoration-2">{item.name}</div>
-                          <div className="text-[7px] text-slate-400 font-bold tracking-widest mt-2 uppercase italic">AVAIL_NODE: {item.stock_quantity} • ACQ: {currency.symbol}{item.purchase_price.toFixed(2)}</div>
+                          <div className="text-[7px] text-slate-400 font-bold tracking-widest mt-2 uppercase italic">Stock: {item.stock_quantity} • Ref: {currency.symbol}{item.purchase_price.toFixed(2)}</div>
                         </div>
                         <button onClick={() => removeFromReturnList(item.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1 active:scale-90">
                           <Trash className="w-3.5 h-3.5" />
@@ -373,18 +373,18 @@ export default function SupplierReturns() {
                           <label className="text-[7px] text-slate-400 font-black tracking-widest uppercase italic">Quantity</label>
                           <div className="flex items-center gap-1.5">
                             <button 
-                              onClick={() => updateQuantity(item.id, item.return_quantity - 1, item.stock_quantity)}
+                               onClick={() => updateQuantity(item.id, item.return_quantity - 1, item.stock_quantity)}
                               className="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 rounded text-slate-400 hover:text-indigo-600 transition-all shadow-sm active:scale-90"
                             ><Minus size={10} /></button>
                             <span className="w-10 text-center text-[11px] font-black text-indigo-600 italic font-mono transition-colors">{item.return_quantity}</span>
                             <button 
-                              onClick={() => updateQuantity(item.id, item.return_quantity + 1, item.stock_quantity)}
+                               onClick={() => updateQuantity(item.id, item.return_quantity + 1, item.stock_quantity)}
                               className="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 rounded text-slate-400 hover:text-indigo-600 transition-all shadow-sm active:scale-90"
                             ><Plus size={10} /></button>
                           </div>
                         </div>
                         <div className="col-span-6 md:col-span-3 text-right">
-                          <label className="text-[7px] text-slate-400 font-black tracking-widest uppercase italic">TOTAL_VAL</label>
+                          <label className="text-[7px] text-slate-400 font-black tracking-widest uppercase italic">Total Value</label>
                           <div className="font-black text-slate-900 italic text-[11px] underline decoration-indigo-500 underline-offset-4 tracking-tighter transition-colors">{currency.symbol}{(item.purchase_price * item.return_quantity).toFixed(2)}</div>
                         </div>
                       </div>
@@ -394,7 +394,7 @@ export default function SupplierReturns() {
                 
                 {returnItems.length > 0 && (
                   <div className="pt-4 border-t border-slate-200 transition-colors">
-                     <label className="text-[8px] text-slate-400 font-black tracking-widest italic mb-2 block uppercase">TRANS_BUFFER_REMARKS</label>
+                     <label className="text-[8px] text-slate-400 font-black tracking-widest italic mb-2 block uppercase">Additional Remarks</label>
                      <textarea 
                        rows={2} 
                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-[10px] font-black rounded p-3 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none italic shadow-inner uppercase tracking-widest transition-colors"

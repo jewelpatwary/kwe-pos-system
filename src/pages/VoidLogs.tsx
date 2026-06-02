@@ -41,7 +41,7 @@ export default function VoidLogs() {
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
             <input 
                 type="text" 
-                placeholder="AUDIT_VOID_SEARCH..." 
+                placeholder="Search void logs..." 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] pl-6 pr-2 py-1.5 rounded outline-none shadow-sm"
@@ -49,7 +49,7 @@ export default function VoidLogs() {
          </div>
          <div className="flex-1"></div>
          <div className="flex gap-2">
-            <span className="px-2 py-1 bg-red-50 border border-red-200 text-red-600 font-black rounded italic">ACTIVE_VOID_SURVEILLANCE</span>
+            <span className="px-2 py-1 bg-red-50 border border-red-200 text-red-600 font-black rounded italic">Void Log Surveillance</span>
          </div>
       </div>
 
@@ -58,11 +58,11 @@ export default function VoidLogs() {
             <thead className="sticky top-0 bg-slate-50 z-20 border-b border-slate-200">
                 <tr className="uppercase tracking-[0.2em] text-slate-500 bg-slate-50/80 backdrop-blur-md transition-colors">
                     <th className="py-3 px-6 font-black border-r border-slate-200">Timestamp</th>
-                    <th className="py-3 px-6 font-black border-r border-slate-200">Sale_Ref</th>
-                    <th className="py-3 px-6 font-black border-r border-slate-200">Asset_Identifier</th>
+                    <th className="py-3 px-6 font-black border-r border-slate-200">Sale Reference</th>
+                    <th className="py-3 px-6 font-black border-r border-slate-200">Product Details</th>
                     <th className="py-3 px-6 font-black border-r border-slate-200 text-center">Qty</th>
-                    <th className="py-3 px-6 font-black border-r border-slate-200">Reason_Code</th>
-                    <th className="py-3 px-6 font-black text-right">Auth_Ident</th>
+                    <th className="py-3 px-6 font-black border-r border-slate-200">Reason</th>
+                    <th className="py-3 px-6 font-black text-right">Authorized By</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 transition-colors">
@@ -73,9 +73,9 @@ export default function VoidLogs() {
                         </td>
                         <td className="py-3 px-6 border-r border-slate-100 font-bold">
                            {log.sale_id ? (
-                             <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">TRX_{log.sale_id}</span>
+                             <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">#{log.sale_id}</span>
                            ) : (
-                             <span className="text-slate-300">MISSING_REF</span>
+                             <span className="text-slate-300">No Reference</span>
                            )}
                         </td>
                         <td className="py-3 px-6 border-r border-slate-100 text-slate-900 font-black uppercase">
@@ -85,14 +85,14 @@ export default function VoidLogs() {
                                 <span className="block text-[8px] text-slate-400 tracking-widest">{log.barcode}</span>
                              </div>
                            ) : (
-                             <span className="text-red-600 font-black italic underline decoration-red-500">COMPLETE_TRX_VOID</span>
+                             <span className="text-red-600 font-black italic underline decoration-red-500">Full Transaction Void</span>
                            )}
                         </td>
                         <td className="py-3 px-6 border-r border-slate-100 text-center text-slate-500 font-bold">
                            {log.quantity ? `[x${log.quantity}]` : 'N/A'}
                         </td>
                         <td className="py-3 px-6 border-r border-slate-100">
-                           <span className="text-orange-600 font-black italic">{log.reason || 'UNSPECIFIED_FAILURE'}</span>
+                           <span className="text-orange-600 font-black italic">{log.reason || 'Not specified'}</span>
                         </td>
                         <td className="py-3 px-6 text-right font-black text-slate-600">
                            {log.void_by_user}
@@ -102,7 +102,7 @@ export default function VoidLogs() {
                 {filteredLogs.length === 0 && (
                     <tr>
                         <td colSpan={6} className="py-20 text-center font-black text-slate-300 uppercase tracking-[0.5em] text-xs">
-                          NO_VOID_ENTRIES_RECORDED
+                          No void entries recorded
                         </td>
                     </tr>
                 )}

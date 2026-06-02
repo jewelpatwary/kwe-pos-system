@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { X, Printer, Loader2, FileText, TrendingUp, CreditCard, Flame } from 'lucide-react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { X, Printer, Loader2, FileText, TrendingUp, CreditCard, Flame, Image as ImageIcon, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from './ThemeProvider';
+import { toPng } from 'html-to-image';
+import { useReactToPrint } from 'react-to-print';
+import { formatDate } from '../lib/utils';
 
 interface POSSummaryModalProps {
   onClose: () => void;
@@ -31,9 +34,11 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
   const [summary, setSummary] = useState<SummaryTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const { token } = useAuthStore();
-  const { currency } = useTheme();
+  const { currency, dateFormat } = useTheme();
   const [storeProfile, setStoreProfile] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -68,8 +73,67 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
     fetchStore();
   }, [token, selectedDate]);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = useReactToPrint({
+    contentRef: summaryRef,
+    documentTitle: `Daily_Summary_${selectedDate}`,
+  });
+
+  const handleDownloadImage = async () => {
+    if (!summaryRef.current) return;
+    setDownloading(true);
+    try {
+      const element = summaryRef.current;
+      
+      // SAVE ORIGINAL STYLES
+      const originalHeight = element.style.height;
+      const originalMaxHeight = element.style.maxHeight;
+      const originalOverflow = element.style.overflow;
+      const originalWidth = element.style.width;
+      const originalScrollTop = element.scrollTop;
+
+      // FORCE EXPANSION AND RESET SCROLL FOR CAPTURE
+      element.scrollTop = 0;
+      element.style.height = 'auto';
+      element.style.maxHeight = 'none';
+      element.style.overflow = 'visible';
+      element.style.width = '520px'; // FIXED WIDTH FOR RECEIPT LOOK
+      
+      // SMALL DELAY TO ENSURE RENDERING SETTLES
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const dataUrl = await toPng(element, {
+        cacheBust: true,
+        backgroundColor: '#ffffff',
+        pixelRatio: 2, // 2X IS STABLE AND HIGH QUALITY
+        width: 520,
+        height: element.scrollHeight + 50,
+        style: {
+          margin: '0',
+          padding: '40px',
+          width: '520px',
+          height: 'auto',
+          overflow: 'visible',
+          transform: 'none'
+        }
+      });
+      
+      // RESTORE ORIGINAL STYLES
+      element.style.height = originalHeight;
+      element.style.maxHeight = originalMaxHeight;
+      element.style.overflow = originalOverflow;
+      element.style.width = originalWidth;
+      element.scrollTop = originalScrollTop;
+      
+      const link = document.createElement('a');
+      link.download = `Daily_Summary_${selectedDate}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Failed to download image', err);
+      alert('Failed to generate image. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const groupedData = data.reduce((acc, curr) => {
@@ -87,7 +151,8 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md"
+      id="print-modal-overlay"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md no-print"
     >
       <motion.div 
         initial={{ scale: 0.95, y: 20 }}
@@ -101,7 +166,7 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
               <FileText className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-black text-slate-900 tracking-widest uppercase text-sm">DAILY_SALES_SUMMARY</h2>
+              <h2 className="font-black text-slate-900 tracking-widest uppercase text-sm">Daily Sales Summary</h2>
               <div className="flex items-center gap-3 mt-1">
                  <input 
                     type="date"
@@ -110,11 +175,19 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
                     className="p-1 border border-slate-300 rounded text-[9px] font-black uppercase text-slate-600 outline-none focus:ring-1 focus:ring-indigo-500"
                  />
                  <span className="text-[10px] font-black text-indigo-600">{currency.symbol}{summary?.grandTotal.toFixed(2)}</span>
-                 <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">• {storeProfile?.shop_name || 'POS_STATION_ALPHA'}</span>
+                 <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">• {storeProfile?.shop_name || 'Main POS Station'}</span>
               </div>
             </div>
           </div>
           <div className="flex gap-2">
+            <button 
+              onClick={handleDownloadImage}
+              disabled={loading || downloading}
+              title="Download as Image"
+              className="p-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-600 rounded transition-all shadow-sm disabled:opacity-50"
+            >
+              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+            </button>
             <button 
               onClick={handlePrint}
               disabled={loading}
@@ -129,11 +202,15 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
         </div>
 
         {/* Content */}
-        <div id="summary-print-area" className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white print:p-0 print:overflow-visible text-slate-900">
+        <div 
+          id="summary-print-area" 
+          ref={summaryRef}
+          className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white print:p-0 print:overflow-visible text-slate-900"
+        >
           {loading ? (
             <div className="h-full flex flex-col items-center justify-center py-20 grayscale opacity-20">
                <Loader2 className="w-12 h-12 animate-spin mb-4" />
-               <div className="text-[10px] font-black uppercase tracking-[0.5em]">COMPILING_DAY_LOGS...</div>
+               <div className="text-[10px] font-black uppercase tracking-[0.5em]">Compiling Daily Sales...</div>
             </div>
           ) : (
             <div className="text-slate-900 font-mono text-[11px] leading-relaxed">
@@ -146,9 +223,9 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
                 {storeProfile?.phone_number && <div className="text-[9px] text-slate-500 uppercase mt-1">TEL: {storeProfile.phone_number}</div>}
                 
                 <div className="mt-6 pt-4 border-t border-slate-200">
-                  <div className="text-[10px] font-black tracking-widest uppercase">DAILY_SALES_REPORT</div>
+                  <div className="text-[10px] font-black tracking-widest uppercase">Daily Sales Report</div>
                   <div className="text-[8px] opacity-60">
-                    {new Date().toLocaleDateString()} 12:00:00 AM - {new Date().toLocaleTimeString()}
+                    REPORT DATE: {formatDate(selectedDate, dateFormat)}
                   </div>
                 </div>
               </div>
@@ -215,15 +292,10 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
                       <span className="font-black tracking-[0.2em] uppercase text-[9px]">Cash Volume</span>
                       <span className="font-bold">{currency.symbol}{summary?.totalCash.toFixed(2)}</span>
                    </div>
-                   
-                   <div className="flex justify-between items-center py-2 px-3 bg-blue-50 border border-blue-100 rounded my-1">
-                      <span className="font-black tracking-[0.2em] uppercase text-[9px] text-blue-700">ONLINE (Bank/Other)</span>
-                      <span className="font-black text-blue-700">{currency.symbol}{summary?.totalOnline.toFixed(2)}</span>
-                   </div>
 
                    <div className="flex justify-between items-center py-2 px-3 bg-indigo-50 border border-indigo-100 rounded my-1">
                       <span className="font-black tracking-[0.2em] uppercase text-[9px] text-indigo-700">TNG (E-Wallet)</span>
-                      <span className="font-black text-indigo-700">{currency.symbol}{summary?.totalTNG.toFixed(2)}</span>
+                      <span className="font-black text-indigo-700">{currency.symbol}{((summary?.totalTNG || 0) + (summary?.totalOnline || 0)).toFixed(2)}</span>
                    </div>
 
                    <div className="flex justify-between items-center py-2 px-3 bg-orange-50 rounded border border-orange-100">
@@ -246,8 +318,8 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
                 </div>
 
                 <div className="mt-10 text-center space-y-1">
-                   <div className="text-[10px] font-black uppercase tracking-[0.3em] italic">--- END_OF_SUMMARY_LOG ---</div>
-                   <div className="text-[8px] opacity-40 font-bold uppercase tracking-widest">SYSTEM_GENERATED_REPORT_MD_v2.0</div>
+                   <div className="text-[10px] font-black uppercase tracking-[0.3em] italic">--- End of Daily Summary ---</div>
+                   <div className="text-[8px] opacity-40 font-bold uppercase tracking-widest">System Generated Report</div>
                 </div>
               </div>
             </div>
@@ -257,32 +329,25 @@ export default function POSSummaryModal({ onClose }: POSSummaryModalProps) {
         {/* CSS for print */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
-            body * {
-              visibility: hidden;
-            }
-            #summary-print-area, #summary-print-area * {
-              visibility: visible;
+            body {
+              background: white !important;
             }
             #summary-print-area {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 80mm; /* Standard receipt width */
-              margin: 0;
-              padding: 5mm;
+              display: block !important;
+              width: 80mm !important;
+              margin: 0 auto !important;
+              padding: 5mm !important;
+              overflow: visible !important;
+              height: auto !important;
+              color: black !important;
+              background: white !important;
             }
             @page {
               size: 80mm auto;
               margin: 0;
             }
-            /* Hide theme-specific colors and backgrounds to save ink and ensure readability */
-            #summary-print-area {
-              background: white !important;
-              color: black !important;
-            }
-            .dark #summary-print-area {
-               color: black !important;
-               background: white !important;
+            .print-hidden, .no-print, button {
+              display: none !important;
             }
           }
         `}} />

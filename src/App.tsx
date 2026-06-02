@@ -20,7 +20,6 @@ import Settings from './pages/Settings';
 import Reports from './pages/Reports';
 import Requisition from './pages/Requisition';
 import CashManagement from './pages/CashManagement';
-import InventoryManagement from './pages/InventoryManagement';
 import InventoryAudit from './pages/InventoryAudit';
 import SystemAdmin from './pages/SystemAdmin';
 import PurchaseManagement from './pages/PurchaseManagement';
@@ -62,7 +61,6 @@ function App() {
             <Route path="stock-adjustment" element={<StockAdjustment />} />
             <Route path="purchase-invoices" element={<PurchaseManagement />} />
             <Route path="requisition" element={<Requisition />} />
-            <Route path="inventory" element={<InventoryManagement />} />
             <Route path="inventory-audit" element={<InventoryAudit />} />
             <Route path="expenses" element={<ExpenseManagement />} />
             <Route path="suppliers" element={<Suppliers />} />

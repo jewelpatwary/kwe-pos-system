@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore, Product } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
+import { useProductStore } from '../store/productStore';
 import { 
   Search, ShoppingCart, Trash2, CreditCard, Banknote, ScanBarcode, 
   Undo2, LogOut, Tag, Ban, Plus, PackageSearch, Star, X, FileText, Settings,
@@ -21,11 +22,15 @@ export default function POS() {
   const { logout, user, token } = useAuthStore();
   const { currency } = useTheme();
   const navigate = useNavigate();
+  const { products, fetchProducts } = useProductStore();
 
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart, discount, returnCredit } = useCartStore();
   const [barcodeInput, setBarcodeInput] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  
+  useEffect(() => {
+    fetchProducts(token!);
+  }, [token]);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,6 +61,20 @@ export default function POS() {
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [storeProfile, setStoreProfile] = useState<any>(null);
   const [posFontSize, setPosFontSize] = useState('12px');
+
+  const scannerStateRef = useRef({ 
+    products, addItem, setSelectedCartItemId, setIsNewInput, customers, 
+    setSelectedCustomer, setErrorMsg, setPriceCheckResult, scanMode,
+    setBarcodeInput
+  });
+
+  useEffect(() => {
+    scannerStateRef.current = { 
+      products, addItem, setSelectedCartItemId, setIsNewInput, customers, 
+      setSelectedCustomer, setErrorMsg, setPriceCheckResult, scanMode,
+      setBarcodeInput
+    };
+  });
 
   useEffect(() => {
     fetch('/api/user/settings/pos_font_size', {
@@ -93,95 +112,13 @@ export default function POS() {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
   const updatePendingSyncCount = () => {
-    try {
-      const q = JSON.parse(localStorage.getItem('pending_offline_sales') || '[]');
-      setPendingSyncCount(q.length);
-    } catch (e) {
-      setPendingSyncCount(0);
-    }
+    // OFFLINE STORAGE DISABLED
+    setPendingSyncCount(0);
   };
 
   const triggerSync = async () => {
-    const qStr = localStorage.getItem('pending_offline_sales');
-    if (!qStr) return;
-    try {
-      const q = JSON.parse(qStr);
-      if (q.length === 0) {
-        setPendingSyncCount(0);
-        return;
-      }
-
-      if (syncing) return;
-      setSyncing(true);
-
-      let syncedCount = 0;
-      const remaining: any[] = [];
-
-      for (const offlineSale of q) {
-        try {
-          const res = await fetch('/api/sales', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(offlineSale.payload)
-          });
-          const data = await res.json();
-          if (data.success) {
-            syncedCount++;
-          } else {
-            remaining.push(offlineSale);
-          }
-        } catch (err) {
-          console.error("Failed to sync transaction", offlineSale.id, err);
-          remaining.push(offlineSale);
-        }
-      }
-
-      localStorage.setItem('pending_offline_sales', JSON.stringify(remaining));
-      setPendingSyncCount(remaining.length);
-      setSyncing(false);
-
-      if (syncedCount > 0) {
-        setErrorMsg(`Successfully synced ${syncedCount} offline transactions!`);
-        setTimeout(() => setErrorMsg(null), 4000);
-        
-        // Refresh product to pull actual server counts
-        try {
-          const [prodRes, catRes, custRes] = await Promise.all([
-            fetch('/api/products'),
-            fetch('/api/categories'),
-            fetch('/api/customers', { headers: { 'Authorization': `Bearer ${token}` } })
-          ]);
-
-          const [prodData, catData, custData] = await Promise.all([
-            prodRes.json(),
-            catRes.json(),
-            custRes.json()
-          ]);
-
-          if (prodData.success) {
-            const salesProds = prodData.data;
-            setProducts(salesProds);
-            localStorage.setItem('cached_products', JSON.stringify(salesProds));
-          }
-          if (catData.success) {
-            setCategories(catData.data);
-            localStorage.setItem('cached_categories', JSON.stringify(catData.data));
-          }
-          if (custData.success) {
-            setCustomers(custData.data);
-            localStorage.setItem('cached_customers', JSON.stringify(custData.data));
-          }
-        } catch (e) {
-          console.error("Refetch tables after sync failed", e);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      setSyncing(false);
-    }
+    // OFFLINE SYNC DISABLED
+    return;
   };
 
   useEffect(() => {
@@ -324,67 +261,160 @@ export default function POS() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [receiptData]);
 
+  /* Scanner listener logic: Global keydown listener to catch hardware scanner input without focusing the input field */
   useEffect(() => {
-    const focusInterval = setInterval(() => {
-      // Don't auto-focus if any modal is open
-      if (showCashCalcModal || showPriceCheck || showCustomerModal || showSummaryModal || showReturnModal || showVoidAuthModal || showVoidSaleModal || showOptionsModal || showShortcutsModal || receiptData) {
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if a modal is open
+      if (showPriceCheck || showCustomerModal || showSummaryModal || showReturnModal || showVoidAuthModal || showVoidSaleModal || showOptionsModal || showShortcutsModal || receiptData || showCashCalcModal) {
         return;
       }
-      
-      const activeElement = document.activeElement;
-      const isInputFocused = activeElement?.tagName === 'INPUT' || 
-                             activeElement?.tagName === 'TEXTAREA' || 
-                             activeElement?.tagName === 'SELECT';
-      
-      if (!isInputFocused || activeElement?.id === 'barcode-scanner') {
-        barcodeInputRef.current?.focus();
+
+      const now = Date.now();
+      if (now - lastKeyTime > 2000) { // Increased to 2000ms for safety
+        buffer = '';
       }
-    }, 500); // 500ms for more responsive re-focus
-    return () => clearInterval(focusInterval);
-  }, [showCashCalcModal, showPriceCheck, showCustomerModal, showSummaryModal, showReturnModal, showVoidAuthModal, showVoidSaleModal, showOptionsModal, showShortcutsModal, receiptData]);
+      lastKeyTime = now;
+      
+      if (e.key === 'Enter') {
+        if (buffer.length > 0) {
+          e.preventDefault();
+          processBarcodeInternal(buffer.trim());
+          buffer = '';
+        }
+      } else if (e.key.length === 1) {
+        e.preventDefault();
+        buffer += e.key;
+        setBarcodeInput(buffer);
+
+        const state = scannerStateRef.current;
+        const matchedProduct = state.products.find(p => 
+            p.barcode?.trim() === buffer.trim() || 
+            (p.barcode && p.barcode.toLowerCase().trim() === buffer.toLowerCase().trim()) || 
+            p.sku?.trim() === buffer.trim() || 
+            p.id.toString() === buffer.trim()
+        );
+        
+        if (matchedProduct) {
+          console.log('Barcode match found:', buffer, matchedProduct);
+          processBarcodeInternal(buffer.trim());
+          buffer = '';
+          setBarcodeInput('');
+        } else {
+            // Optional: reset buffer if it gets too long and doesn't match
+            if (buffer.length > 30) {
+              console.log('Barcode buffer too long, resetting:', buffer);
+              buffer = '';
+              setBarcodeInput('');
+            }
+        }
+      }
+    };
+
+    // Helper to process the barcode
+    const processBarcodeInternal = async (code: string) => {
+      console.log('Processing barcode:', code);
+      const state = scannerStateRef.current;
+      state.setBarcodeInput('');
+      state.setErrorMsg(null);
+      state.setPriceCheckResult(null);
+
+      // 1. Instant Customer RFID or Emp ID lookup
+      const matchedCustomer = state.customers.find(c => 
+        c.rfid_card === code || 
+        (c.rfid_card && c.rfid_card.toLowerCase() === code.toLowerCase()) ||
+        c.emp_id === code ||
+        c.phone === code
+      );
+
+      if (matchedCustomer) {
+        if (matchedCustomer.credit_status === 'ACTIVE') {
+          state.setSelectedCustomer(matchedCustomer);
+          state.setErrorMsg(`Customer Active: ${matchedCustomer.name.toUpperCase()}`);
+          setTimeout(() => state.setErrorMsg(null), 3000);
+          return;
+        } else {
+          state.setErrorMsg(`Customer Blocked/Inactive: ${matchedCustomer.name.toUpperCase()}`);
+          setTimeout(() => state.setErrorMsg(null), 4000);
+          return;
+        }
+      }
+
+      // 2. Instant Local Product lookup
+      const matchedProduct = state.products.find(p => 
+        p.barcode === code || 
+        (p.barcode && p.barcode.toLowerCase() === code.toLowerCase()) || 
+        p.sku === code || 
+        p.id.toString() === code
+      );
+
+      if (matchedProduct) {
+        if (state.scanMode === 'PRICE_CHECK') {
+          state.setPriceCheckResult(matchedProduct);
+        } else {
+          state.addItem(matchedProduct);
+          state.setSelectedCartItemId(matchedProduct.id);
+          state.setIsNewInput(true);
+        }
+        return;
+      }
+
+      // 3. Network fallback
+      try {
+        if (state.scanMode === 'PRICE_CHECK') {
+          const response = await fetch(`/api/products/price-check/${code}`);
+          const data = await response.json();
+          if (data.success) {
+            state.setPriceCheckResult(data.data);
+          } else {
+            state.setErrorMsg(`Not found (${code})`);
+            setTimeout(() => state.setErrorMsg(null), 3000);
+          }
+        } else {
+          const response = await fetch(`/api/products/barcode/${code}`);
+          const data = await response.json();
+          if (data.success) {
+            state.addItem(data.data);
+            state.setSelectedCartItemId(data.data.id);
+            state.setIsNewInput(true);
+          } else {
+            state.setErrorMsg(`Not found (${code})`);
+            setTimeout(() => state.setErrorMsg(null), 3000);
+          }
+        }
+      } catch (err) {
+        state.setErrorMsg('Network error (No local match found)');
+        setTimeout(() => state.setErrorMsg(null), 3000);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [prodRes, catRes, custRes] = await Promise.all([
-          fetch('/api/products'),
+        const [catRes, custRes] = await Promise.all([
           fetch('/api/categories'),
           fetch('/api/customers', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
-        const [prodData, catData, custData] = await Promise.all([
-          prodRes.json(),
+        const [catData, custData] = await Promise.all([
           catRes.json(),
           custRes.json()
         ]);
 
-        if (prodData.success) {
-          const salesProds = prodData.data;
-          setProducts(salesProds);
-          localStorage.setItem('cached_products', JSON.stringify(salesProds));
-        }
         if (catData.success) {
           setCategories(catData.data);
-          localStorage.setItem('cached_categories', JSON.stringify(catData.data));
         }
         if (custData.success) {
           setCustomers(custData.data);
-          localStorage.setItem('cached_customers', JSON.stringify(custData.data));
         }
       } catch (err) {
-        console.warn("Offline or network error fetching data, loading from local cache:", err);
-        try {
-          const cachedProds = localStorage.getItem('cached_products');
-          if (cachedProds) setProducts(JSON.parse(cachedProds));
-          
-          const cachedCats = localStorage.getItem('cached_categories');
-          if (cachedCats) setCategories(JSON.parse(cachedCats));
-
-          const cachedCusts = localStorage.getItem('cached_customers');
-          if (cachedCusts) setCustomers(JSON.parse(cachedCusts));
-        } catch (storageErr) {
-          console.error("Failed to parse local stored caches:", storageErr);
-        }
+        console.warn("Network error fetching categories and customers:", err);
       }
     };
     fetchData();
@@ -545,65 +575,8 @@ export default function POS() {
       });
       data = await res.json();
     } catch (err) {
-      console.warn("Sale network fetch failed, falling back to local offline mode.");
-      isOffline = true;
-    }
-
-    if (isOffline) {
-      // Offline transaction flow
-      const offlineSaleId = `OFFLINE-${Date.now()}`;
-      
-      try {
-        const pendingSalesStr = localStorage.getItem('pending_offline_sales') || '[]';
-        const pendingSales = JSON.parse(pendingSalesStr);
-        pendingSales.push({ id: offlineSaleId, payload, timestamp: new Date().toISOString() });
-        localStorage.setItem('pending_offline_sales', JSON.stringify(pendingSales));
-        updatePendingSyncCount();
-      } catch (e) {
-        console.error("Failed to append offline transaction to queue", e);
-      }
-
-      // Simulate stock deduction locally
-      const updatedProducts = products.map(p => {
-        const itemInCart = checkoutItems.find(i => i.id === p.id);
-        if (itemInCart) {
-          return { ...p, stock: Math.max(0, (p.stock || 0) - itemInCart.cart_quantity) };
-        }
-        return p;
-      });
-      setProducts(updatedProducts);
-      localStorage.setItem('cached_products', JSON.stringify(updatedProducts));
-
-      // Simulate customer balance update locally to enforce credit limits
-      if (method === 'CREDIT' && checkoutCustomer) {
-        const updatedCustomers = customers.map(c => {
-          if (c.id === checkoutCustomer.id) {
-            const currentBalance = parseFloat(c.current_balance || '0');
-            const saleTotal = checkoutItems.reduce((sum, item) => sum + item.selling_price * item.cart_quantity, 0) - checkoutDiscount;
-            const newBalance = (currentBalance + saleTotal).toFixed(2);
-            return { ...c, current_balance: newBalance };
-          }
-          return c;
-        });
-        setCustomers(updatedCustomers);
-        localStorage.setItem('cached_customers', JSON.stringify(updatedCustomers));
-      }
-
-      // Update receipt to offline status
-      setReceiptData((prev: any) => {
-        if (prev && prev.saleId === tempSaleId) {
-          return {
-            ...prev,
-            saleId: offlineSaleId,
-            isOffline: true,
-            isPendingSync: false
-          };
-        }
-        return prev;
-      });
-
-      setErrorMsg("OFFLINE Transaction Saved! It will sync automatically.");
-      setTimeout(() => setErrorMsg(null), 4000);
+      console.warn("Sale network fetch failed.");
+      setErrorMsg("Transaction failed: Network error. Data not saved.");
       return;
     }
 
@@ -622,13 +595,7 @@ export default function POS() {
 
       // Refresh products in background
       try {
-        const pRes = await fetch('/api/products');
-        const pData = await pRes.json();
-        if (pData.success) {
-          const salesProds = pData.data;
-          setProducts(salesProds);
-          localStorage.setItem('cached_products', JSON.stringify(salesProds));
-        }
+        await fetchProducts(token!);
       } catch (err) {
         console.error("Failed to refresh products after successful online checkout", err);
       }
@@ -672,22 +639,7 @@ export default function POS() {
             }`} title="Connection Status">
               {onlineStatus ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
               <span>{onlineStatus ? 'ONLINE' : 'OFFLINE'}</span>
-              {pendingSyncCount > 0 && (
-                <span className="bg-rose-600 text-white font-extrabold px-1 rounded-sm text-[7px]" title="Pending transactions to sync">
-                  {pendingSyncCount} QUEUED
-                </span>
-              )}
             </div>
-
-            {pendingSyncCount > 0 && onlineStatus && (
-              <button
-                onClick={triggerSync}
-                disabled={syncing}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded cursor-pointer border border-indigo-500 font-bold text-[8px] transition-colors flex items-center gap-1.5"
-              >
-                {syncing ? 'SYNCING...' : 'SYNC NOW'}
-              </button>
-            )}
 
             <button 
               onClick={() => {
@@ -879,11 +831,10 @@ export default function POS() {
                 id="barcode-scanner"
                 ref={barcodeInputRef}
                 type="text"
-                inputMode="none"
                 placeholder="Barcode..."
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                className={`w-full bg-white border rounded pl-9 pr-3 py-2.5 text-[11px] font-black transition-all caret-transparent ${scanMode === 'PRICE_CHECK' ? 'border-emerald-500/50 text-emerald-600 ' : 'border-indigo-500/50 text-indigo-600 '}`}
+                className="w-full bg-white border border-slate-200 text-indigo-600 rounded pl-10 pr-4 py-2.5 outline-none focus:ring-1 focus:ring-indigo-500 text-[11px] font-black italic shadow-inner tracking-widest cursor-default"
               />
             </form>
           </div>

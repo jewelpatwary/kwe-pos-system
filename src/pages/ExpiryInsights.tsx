@@ -86,7 +86,7 @@ const ExpiryInsights: React.FC = () => {
       <div className="bg-slate-50 border-b border-slate-200 p-3 flex flex-wrap items-center justify-between sticky top-0 z-20 shadow-md">
         <div className="flex items-center gap-3">
           <ShieldAlert className="w-4 h-4 text-red-500" />
-          <span className="text-slate-900 font-black tracking-widest">EXPIRY_INSIGHTS_PROTOCOL</span>
+          <span className="text-slate-900 font-black tracking-widest">Expiry Insights</span>
         </div>
         
         <div className="flex items-center gap-3">
@@ -97,16 +97,16 @@ const ExpiryInsights: React.FC = () => {
               onChange={(e) => setDaysThreshold(parseInt(e.target.value))}
               className="pl-8 pr-4 py-1.5 bg-white border border-slate-200 text-[9px] font-black text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-inner rounded"
             >
-              <option value={30}>EXPIRES_IN_30_DAYS</option>
-              <option value={60}>EXPIRES_IN_60_DAYS</option>
-              <option value={90}>EXPIRES_IN_90_DAYS</option>
-              <option value={180}>EXPIRES_IN_180_DAYS</option>
-              <option value={365}>EXPIRES_IN_365_DAYS</option>
+              <option value={30}>Expires in 30 days</option>
+              <option value={60}>Expires in 60 days</option>
+              <option value={90}>Expires in 90 days</option>
+              <option value={180}>Expires in 180 days</option>
+              <option value={365}>Expires in 365 days</option>
             </select>
           </div>
           <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-[9px] tracking-widest transition shadow-md rounded">
             <Download className="w-3.5 h-3.5" />
-            EXPORT_LOG
+            Export Log
           </button>
         </div>
       </div>
@@ -118,7 +118,7 @@ const ExpiryInsights: React.FC = () => {
           <div className="bg-white p-4 border border-slate-200 flex flex-col relative overflow-hidden shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-1 px-2 bg-red-100 border border-red-200 rounded text-red-600 font-black text-[8px] tracking-widest uppercase">
-                CRITICAL_EXPIRED
+                Critical Expired
               </div>
             </div>
             <div className="text-3xl font-black text-slate-900 italic tracking-tighter">
@@ -129,7 +129,7 @@ const ExpiryInsights: React.FC = () => {
           <div className="bg-white p-4 border border-slate-200 flex flex-col relative overflow-hidden shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-1 px-2 bg-orange-100 border border-orange-200 rounded text-orange-600 font-black text-[8px] tracking-widest uppercase">
-                EXPIRING_30D
+                Expiring in 30 Days
               </div>
             </div>
             <div className="text-3xl font-black text-slate-900 italic tracking-tighter">
@@ -140,7 +140,7 @@ const ExpiryInsights: React.FC = () => {
           <div className="bg-white p-4 border border-slate-200 flex flex-col relative overflow-hidden shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-1 px-2 bg-amber-100 border border-amber-200 rounded text-amber-600 font-black text-[8px] tracking-widest uppercase">
-                TOTAL_RISK_ATTRITION
+                Total At Risk
               </div>
             </div>
             <div className="text-3xl font-black text-slate-900 italic tracking-tighter">
@@ -151,7 +151,7 @@ const ExpiryInsights: React.FC = () => {
           <div className="bg-white p-4 border border-slate-200 flex flex-col relative overflow-hidden shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-1 px-2 bg-emerald-100 border border-emerald-200 rounded text-emerald-600 font-black text-[8px] tracking-widest uppercase">
-                REMAINING_STOCK
+                Remaining Stock
               </div>
             </div>
             <div className="text-3xl font-black text-slate-900 italic tracking-tighter">
@@ -167,7 +167,7 @@ const ExpiryInsights: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="PROBE_PRODUCT_NAME_OR_BARCODE..." 
+                placeholder="Search product name or barcode..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded pl-10 pr-4 py-2 outline-none focus:ring-1 focus:ring-indigo-500 shadow-inner uppercase tracking-widest"
@@ -179,22 +179,22 @@ const ExpiryInsights: React.FC = () => {
             <table className="w-full text-left border-collapse text-[10px] uppercase font-sans">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-[8px] uppercase font-black tracking-widest border-b border-slate-200">
-                  <th className="py-3 px-4 border-r border-slate-200/50">PRODUCT_DESCRIPTOR</th>
-                  <th className="py-3 px-4 text-center border-r border-slate-200/50">BATCH_ID</th>
-                  <th className="py-3 px-4 text-center border-r border-slate-200/50">EXP_DATE</th>
-                  <th className="py-3 px-4 text-center border-r border-slate-200/50">TTL_STOCK</th>
-                  <th className="py-3 px-4 text-center border-r border-slate-200/50">STATUS_FLAGS</th>
-                  <th className="py-3 px-4">SUPPLY_ORIGIN</th>
+                  <th className="py-3 px-4 border-r border-slate-200/50">Product Description</th>
+                  <th className="py-3 px-4 text-center border-r border-slate-200/50">Batch ID</th>
+                  <th className="py-3 px-4 text-center border-r border-slate-200/50">Expiry Date</th>
+                  <th className="py-3 px-4 text-center border-r border-slate-200/50">Total Stock</th>
+                  <th className="py-3 px-4 text-center border-r border-slate-200/50">Status</th>
+                  <th className="py-3 px-4">Supplier</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 font-black animate-pulse tracking-widest text-[9px]">SYNCHRONIZING_EXPIRY_DATA...</td>
+                    <td colSpan={6} className="py-12 text-center text-slate-400 font-black animate-pulse tracking-widest text-[9px]">Synchronizing Expiry Data...</td>
                   </tr>
                 ) : filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 font-black tracking-widest text-[9px]">NO_CRITICAL_EXPIRY_THRESHOLD_DETECTED</td>
+                    <td colSpan={6} className="py-12 text-center text-slate-400 font-black tracking-widest text-[9px]">No critical expiry detected</td>
                   </tr>
                 ) : (
                   filteredItems.map((item) => {
@@ -206,7 +206,7 @@ const ExpiryInsights: React.FC = () => {
                       >
                         <td className="py-3 px-4 border-r border-slate-200/50">
                             <div className="font-black text-slate-900 italic tracking-tighter text-[11px] leading-tight uppercase underline underline-offset-4 decoration-indigo-500/30 decoration-2">{item.product_name}</div>
-                            <div className="text-[7px] text-slate-400 font-bold tracking-widest mt-1 uppercase">[{item.barcode || 'NULL_BARCODE'}]</div>
+                            <div className="text-[7px] text-slate-400 font-bold tracking-widest mt-1 uppercase">[{item.barcode || 'No Barcode'}]</div>
                         </td>
                         <td className="py-3 px-4 text-center border-r border-slate-200/50">
                             <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[8px] font-black uppercase tracking-widest rounded border border-slate-200">
@@ -216,20 +216,20 @@ const ExpiryInsights: React.FC = () => {
                         <td className="py-3 px-4 text-center border-r border-slate-200/50">
                             <div className="text-[10px] font-black text-slate-900 italic font-mono">{item.expiry_date}</div>
                             <div className={`text-[8px] font-black mt-1 tracking-wider ${daysLeft <= 30 ? 'text-red-500' : 'text-slate-400'}`}>
-                                {daysLeft <= 0 ? 'STATUS: EXPIRED' : `T-MINUS: ${daysLeft} DAYS`}
+                                {daysLeft <= 0 ? 'STATUS: EXPIRED' : `EXPIRES IN: ${daysLeft} DAYS`}
                             </div>
                         </td>
                         <td className="py-3 px-4 text-center border-r border-slate-200/50">
                             <div className="text-[12px] font-black text-slate-900 italic">{item.total_stock}</div>
-                            <div className="text-[7px] text-slate-400 font-bold mt-1 tracking-widest uppercase">SYS_RESERVE</div>
+                            <div className="text-[7px] text-slate-400 font-bold mt-1 tracking-widest uppercase">System Reserved</div>
                         </td>
                         <td className="py-3 px-4 text-center border-r border-slate-200/50">
                             <div className={`inline-flex items-center px-2 py-0.5 rounded text-[8px] font-black border tracking-widest ${getStatusColor(item.expiry_date)}`}>
-                                {daysLeft <= 0 ? 'CRITICAL_FAIL' : daysLeft <= 30 ? 'URGENT_LIQUIDATE' : 'MONITOR_CLOSELY'}
+                                {daysLeft <= 0 ? 'EXPIRED' : daysLeft <= 30 ? 'URGENT' : 'MONITOR'}
                             </div>
                         </td>
                         <td className="py-3 px-4">
-                            <div className="text-[10px] font-black text-slate-900 italic tracking-widest">{item.supplier_name || 'UNKNOWN_SOURCE'}</div>
+                            <div className="text-[10px] font-black text-slate-900 italic tracking-widest">{item.supplier_name || 'Unknown Source'}</div>
                             <div className="text-[7px] text-slate-400 font-bold uppercase mt-1 tracking-widest">INV: {item.invoice_number || 'SYSTEM'}</div>
                         </td>
                       </tr>

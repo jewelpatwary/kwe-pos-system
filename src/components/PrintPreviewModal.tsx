@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { X, Printer } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useReactToPrint } from 'react-to-print';
 
 interface PrintPreviewModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface PrintPreviewModalProps {
 export default function PrintPreviewModal({ isOpen, onClose, title, children, hideHeader }: PrintPreviewModalProps) {
   const [storeProfile, setStoreProfile] = useState<any>(null);
   const { token } = useAuthStore();
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen && token) {
@@ -29,11 +31,12 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children, hi
     }
   }, [isOpen, token]);
 
-  if (!isOpen) return null;
+  const handlePrint = useReactToPrint({
+    contentRef: contentRef,
+    documentTitle: title,
+  });
 
-  const handlePrint = () => {
-    window.print();
-  };
+  if (!isOpen) return null;
 
   const now = new Date().toLocaleString();
 
@@ -41,8 +44,8 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children, hi
   const shouldHideHeader = hideHeader !== undefined ? hideHeader : isReceipt;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm print-hide" id="print-modal-overlay">
-      <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-auto flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm no-print" id="print-modal-overlay">
+      <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="no-print flex justify-between items-center mb-4 border-b pb-2">
           <h2 className="text-xl font-bold">{title}</h2>
           <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
@@ -50,7 +53,7 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children, hi
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto mb-4 print-content" id="print-content">
+        <div className="flex-1 overflow-y-auto mb-4 print-content" id="print-content" ref={contentRef}>
           {!shouldHideHeader && (
             <div className="mb-6 flex justify-between items-center border-b pb-4">
               <div>
@@ -75,6 +78,26 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children, hi
             Print Confirm
           </button>
         </div>
+        
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            body { background: white !important; }
+            .no-print { display: none !important; }
+            .print-content {
+              display: block !important;
+              overflow: visible !important;
+              width: ${isReceipt ? '80mm' : '100%'} !important;
+              margin: ${isReceipt ? '0 auto' : '0'} !important;
+              padding: ${isReceipt ? '5mm' : '0'} !important;
+              background: white !important;
+              color: black !important;
+            }
+            @page {
+              size: ${isReceipt ? '80mm auto' : 'auto'};
+              margin: 10mm;
+            }
+          }
+        `}} />
       </div>
     </div>
   );

@@ -46,26 +46,7 @@ export default function PurchaseManagement() {
     fetchSuppliers();
     fetchStats();
     fetchOptions();
-
-    const draft = localStorage.getItem('invoice_draft');
-    if (draft) {
-      try {
-        setNewInvoice(JSON.parse(draft));
-      } catch (e) {
-        console.error('Failed to parse invoice draft', e);
-      }
-    }
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('invoice_draft', JSON.stringify(newInvoice));
-  }, [newInvoice]);
-
-  useEffect(() => {
-    if (!token) {
-      localStorage.removeItem('invoice_draft');
-    }
-  }, [token]);
 
   const fetchOptions = async () => {
     try {
@@ -231,7 +212,6 @@ export default function PurchaseManagement() {
       });
       const data = await res.json();
       if (data.success) {
-        localStorage.removeItem('invoice_draft');
         setNewInvoice({
             id: null,
             invoice_number: '',

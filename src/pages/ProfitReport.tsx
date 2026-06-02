@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../components/ThemeProvider';
+import { formatDate } from '../lib/utils';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -34,7 +35,7 @@ import {
 export default function ProfitReport() {
   const navigate = useNavigate();
   const { token } = useAuthStore();
-  const { currency } = useTheme();
+  const { currency, dateFormat } = useTheme();
   
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
@@ -113,7 +114,7 @@ export default function ProfitReport() {
                 {data?.dailyLedger?.map((row: any, i: number) => (
                     <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="py-3 px-6 border-r border-slate-100 text-slate-400 font-bold tracking-widest">
-                           {row.date}
+                           {formatDate(row.date, dateFormat)}
                         </td>
                         <td className="py-3 px-6 border-r border-slate-100 text-right text-slate-900 font-black underline decoration-indigo-200 underline-offset-4">
                            {currency.symbol}{row.sales.toFixed(2)}

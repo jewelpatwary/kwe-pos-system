@@ -18,11 +18,12 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../components/ThemeProvider';
+import { formatDate } from '../lib/utils';
 
 export default function SalesReport() {
   const navigate = useNavigate();
   const { token, user } = useAuthStore();
-  const { currency } = useTheme();
+  const { currency, dateFormat } = useTheme();
   
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<any[]>([]);
@@ -113,7 +114,7 @@ export default function SalesReport() {
                 {rows.map((row, i) => (
                     <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="py-3 px-4 border-r border-slate-100">
-                           <div className="text-slate-400 font-black italic">{new Date(row.timestamp).toLocaleDateString()}</div>
+                           <div className="text-slate-400 font-black italic">{formatDate(row.timestamp, dateFormat)}</div>
                            <div className="text-slate-300 text-[8px] font-bold">{new Date(row.timestamp).toLocaleTimeString()}</div>
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100 italic text-indigo-600 font-black tracking-widest">

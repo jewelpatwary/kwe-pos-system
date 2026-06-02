@@ -19,8 +19,8 @@ export default function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmText = 'CONFIRM_DELETE',
-  cancelText = 'ABORT_ACTION',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   variant = 'danger'
 }: ConfirmModalProps) {
   if (!isOpen) return null;

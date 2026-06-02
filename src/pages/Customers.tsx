@@ -277,7 +277,7 @@ export default function Customers() {
                 onClick={() => setShowImportModal(true)}
                 className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded transition-all flex items-center gap-2 shadow-sm font-black"
             >
-                <UploadCloud className="w-3.5 h-3.5 text-indigo-500" /> BULK_UPLOAD
+                <UploadCloud className="w-3.5 h-3.5 text-indigo-500" /> Bulk Upload
             </button>
             <button 
                 onClick={() => setShowSettings(true)}
@@ -307,7 +307,7 @@ export default function Customers() {
       <div className="flex-1 overflow-auto border-x border-slate-200 bg-white">
         {loading && customers.length === 0 ? (
              <div className="flex items-center justify-center h-full">
-                <div className="animate-pulse tracking-[0.5em] text-slate-400">SYNCING_CUSTOMER_DATABASE...</div>
+                <div className="animate-pulse tracking-[0.5em] text-slate-400">Syncing database list...</div>
              </div>
         ) : (
           <table className="w-full text-left border-collapse">
@@ -777,7 +777,7 @@ export default function Customers() {
         <div className="fixed inset-0 bg-slate-100/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <div className="bg-white border border-slate-200 rounded max-w-sm w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
                 <div className="p-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <span className="text-slate-900 font-black tracking-widest text-[10px]">MEMBER_BULK_UPLOAD</span>
+                    <span className="text-slate-900 font-black tracking-widest text-[10px]">Customer Bulk Upload</span>
                     <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-900 transition-colors"><X size={16}/></button>
                 </div>
                 <div className="p-6 space-y-6">
@@ -895,7 +895,7 @@ export default function Customers() {
                         disabled={!importFile || importLoading}
                         className="w-full py-4 bg-indigo-600 text-white font-black text-[9px] tracking-widest hover:bg-indigo-700 disabled:opacity-30 transition-all rounded shadow-lg shadow-indigo-500/20 uppercase"
                     >
-                        {importLoading ? 'PROCESSING...' : 'START_IMPORT'}
+                        {importLoading ? 'Processing...' : 'Start Import'}
                     </button>
                 </div>
             </div>

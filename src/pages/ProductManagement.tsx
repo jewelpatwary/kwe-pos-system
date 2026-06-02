@@ -7,12 +7,13 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useProductStore } from '../store/productStore';
 import ConfirmModal from '../components/ConfirmModal';
 import { useTheme } from '../components/ThemeProvider';
 
 export default function ProductManagement() {
   const navigate = useNavigate();
-  const [products, setProducts] = useState<any[]>([]);
+  const { products, fetchProducts, setProducts } = useProductStore();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [categories2, setCategories2] = useState<any[]>([]);
@@ -60,11 +61,10 @@ export default function ProductManagement() {
     finally { setLoadingBatches(false); }
   };
 
-  const fetchData = async () => {
+  const fetchAdditionalMetadata = async () => {
     try {
       setLoading(true);
-      const [prodRes, supRes, catRes, cat2Res, brandRes, unitRes] = await Promise.all([
-        fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } }),
+      const [supRes, catRes, cat2Res, brandRes, unitRes] = await Promise.all([
         fetch('/api/suppliers', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/categories', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/categories2', { headers: { 'Authorization': `Bearer ${token}` } }),
@@ -72,11 +72,10 @@ export default function ProductManagement() {
         fetch('/api/units', { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
-      const [prodData, supData, catData, cat2Data, brandData, unitData] = await Promise.all([
-        prodRes.json(), supRes.json(), catRes.json(), cat2Res.json(), brandRes.json(), unitRes.json()
+      const [supData, catData, cat2Data, brandData, unitData] = await Promise.all([
+        supRes.json(), catRes.json(), cat2Res.json(), brandRes.json(), unitRes.json()
       ]);
 
-      if (prodData.success) setProducts(prodData.data);
       if (supData.success) setSuppliers(supData.data);
       if (catData.success) setCategories(catData.data);
       if (cat2Data.success) setCategories2(cat2Data.data);
@@ -89,26 +88,13 @@ export default function ProductManagement() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-    const draft = localStorage.getItem('product_draft');
-    if (draft) {
-      try {
-        setFormData(JSON.parse(draft));
-      } catch (e) {
-        console.error('Failed to parse product draft', e);
-      }
-    }
-  }, []);
+  const refreshData = (force = true) => {
+    fetchProducts(token!, force);
+    fetchAdditionalMetadata();
+  };
 
   useEffect(() => {
-    localStorage.setItem('product_draft', JSON.stringify(formData));
-  }, [formData]);
-
-  useEffect(() => {
-    if (!token) {
-      localStorage.removeItem('product_draft');
-    }
+    refreshData();
   }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -148,7 +134,6 @@ export default function ProductManagement() {
 
       const data = await res.json();
       if (data.success) {
-        localStorage.removeItem('product_draft');
         setFormData({
             id: '', name: '', barcode: '', category_id: '', category2_id: '', brand_id: '', unit_id: '',
             purchase_price: '', selling_price: '', stock_quantity: '', supplier_id: '',
@@ -159,7 +144,7 @@ export default function ProductManagement() {
         });
         setShowForm(false);
         resetForm();
-        fetchData();
+        refreshData();
       } else {
         alert(data.message || 'Error saving product');
       }
@@ -183,7 +168,7 @@ export default function ProductManagement() {
         headers: { 'Authorization': 'Bearer ' + token }
       });
       const data = await res.json();
-      if (data.success) fetchData();
+      if (data.success) refreshData();
       else alert(data.message);
     } catch (err) {
       console.error(err);
@@ -297,7 +282,7 @@ export default function ProductManagement() {
           if (data.success) {
             setImportStatus(`Success! Bulk import completed. ${processedRows.length} products processed.`);
             setImportFile(null);
-            fetchData();
+            refreshData();
           } else {
             setImportStatus('Error: ' + data.message);
           }
@@ -632,6 +617,7 @@ export default function ProductManagement() {
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200 text-[9px]">
               <tr className="text-slate-500 bg-slate-50/80 backdrop-blur-md transition-colors">
+                <th className="py-4 px-6 font-black border-r border-slate-200">PRODUCT ID</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">NAME</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">CODE</th>
                 <th className="py-4 px-6 font-black border-r border-slate-200">CAT</th>
@@ -649,6 +635,9 @@ export default function ProductManagement() {
             <tbody className="divide-y divide-slate-100 transition-colors">
               {filteredProducts.map((product) => (
                 <tr key={product.id} className="hover:bg-slate-50 transition-colors group">
+                  <td className="py-4 px-6 border-r border-slate-100 font-mono text-[10px] text-slate-500 font-bold">
+                    #{product.id}
+                  </td>
                   <td className="py-4 px-6 border-r border-slate-100 text-slate-900 font-black italic tracking-widest">
                     {product.name}
                   </td>
@@ -700,7 +689,7 @@ export default function ProductManagement() {
               ))}
               {filteredProducts.length === 0 && !loading && (
                 <tr>
-                   <td colSpan={11} className="py-20 text-center font-black text-slate-300 tracking-[0.5em]">REGISTRY_NULL_SPACE</td>
+                   <td colSpan={13} className="py-20 text-center font-black text-slate-300 tracking-[0.5em]">REGISTRY_NULL_SPACE</td>
                 </tr>
               )}
             </tbody>
@@ -712,50 +701,50 @@ export default function ProductManagement() {
 
       {/* Detail Overlay */}
       {selectedProductDetails && (
-        <div className="fixed inset-0 bg-[#0f1117]/90 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setSelectedProductDetails(null)}>
-          <div className="bg-[#181a20] border border-[#2d303b] rounded shadow-2xl max-w-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
-            <div className="p-3 border-b border-[#2d303b] bg-[#1c1f26] flex justify-between items-center">
-                <span className="text-white font-black">META_ANALYSIS // {selectedProductDetails.name}</span>
-                <button onClick={() => setSelectedProductDetails(null)} className="p-1 hover:bg-red-500/20 text-slate-500 hover:text-red-400"><X size={16}/></button>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setSelectedProductDetails(null)}>
+          <div className="bg-white border border-slate-200 rounded shadow-2xl max-w-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+            <div className="p-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <span className="text-slate-900 font-black">META_ANALYSIS // {selectedProductDetails.name}</span>
+                <button onClick={() => setSelectedProductDetails(null)} className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded transition-colors"><X size={16}/></button>
             </div>
             <div className="p-6 overflow-auto max-h-[70vh]">
-                 <div className="grid grid-cols-2 gap-6 bg-[#0f1117] p-4 border border-[#2d303b] rounded mb-6">
+                 <div className="grid grid-cols-2 gap-6 bg-slate-50 p-4 border border-slate-200 rounded mb-6">
                     <div className="space-y-4">
                         <div>
-                            <div className="text-[7px] text-slate-500 font-black mb-1 tracking-widest">Product ID</div>
-                            <div className="text-white font-black italic">{selectedProductDetails.id}</div>
+                            <div className="text-[7px] text-slate-400 font-black mb-1 tracking-widest">Product ID</div>
+                            <div className="text-slate-900 font-black italic">{selectedProductDetails.id}</div>
                         </div>
                         <div>
-                            <div className="text-[7px] text-slate-500 font-black mb-1 tracking-widest">Barcode</div>
-                            <div className="text-white font-black font-mono underline decoration-indigo-900 underline-offset-4">{selectedProductDetails.barcode}</div>
+                            <div className="text-[7px] text-slate-400 font-black mb-1 tracking-widest">Barcode</div>
+                            <div className="text-slate-900 font-black font-mono underline decoration-indigo-200 underline-offset-4">{selectedProductDetails.barcode}</div>
                         </div>
                     </div>
                     <div className="space-y-4">
                         <div>
-                            <div className="text-[7px] text-slate-500 font-black mb-1 tracking-widest">Price</div>
-                            <div className="text-emerald-400 font-black text-xl italic">{currency.symbol}{selectedProductDetails.selling_price}</div>
+                            <div className="text-[7px] text-slate-400 font-black mb-1 tracking-widest">Price</div>
+                            <div className="text-emerald-600 font-black text-xl italic">{currency.symbol}{selectedProductDetails.selling_price}</div>
                         </div>
                         <div>
-                            <div className="text-[7px] text-slate-500 font-black mb-1 tracking-widest">Stock Level</div>
-                            <div className="text-white font-black italic text-lg">{selectedProductDetails.stock_quantity} <span className="text-slate-600 text-[8px]">{selectedProductDetails.unit_name}</span></div>
+                            <div className="text-[7px] text-slate-400 font-black mb-1 tracking-widest">Stock Level</div>
+                            <div className="text-slate-900 font-black italic text-lg">{selectedProductDetails.stock_quantity} <span className="text-slate-400 text-[8px]">{selectedProductDetails.unit_name}</span></div>
                         </div>
                     </div>
                  </div>
                  
                  <div className="space-y-3">
-                    <h4 className="text-indigo-400 font-black text-[9px] tracking-widest border-b border-[#2d303b] pb-1 italic">Batch History</h4>
+                    <h4 className="text-indigo-600 font-black text-[9px] tracking-widest border-b border-slate-200 pb-1 italic">Batch History</h4>
                     {loadingBatches ? (
-                        <div className="animate-pulse py-4 font-black text-slate-700">QUERYING_BATCH_STREAM...</div>
+                        <div className="animate-pulse py-4 font-black text-slate-400">QUERYING_BATCH_STREAM...</div>
                     ) : (
                         <div className="space-y-2">
                             {productBatches.map(b => (
-                                <div key={b.id} className="bg-[#1c1f26] px-4 py-2 border border-[#2d303b] flex justify-between items-center group hover:bg-[#2d303b] transition">
+                                <div key={b.id} className="bg-slate-50 px-4 py-2 border border-slate-100 flex justify-between items-center group hover:bg-slate-100 transition rounded">
                                     <span className="text-slate-400 font-black italic">[BATCH_#{b.batch_number}]</span>
-                                    <span className="text-white font-black">{b.quantity} Units</span>
-                                    <span className="text-red-400 font-black italic">{b.expiry_date}</span>
+                                    <span className="text-slate-900 font-black">{b.quantity} Units</span>
+                                    <span className="text-red-600 font-black italic">{b.expiry_date}</span>
                                 </div>
                             ))}
-                            {productBatches.length === 0 && <div className="py-8 text-center text-slate-800 font-black tracking-[0.2em] italic">No batches found</div>}
+                            {productBatches.length === 0 && <div className="py-8 text-center text-slate-400 font-black tracking-[0.2em] italic">No batches found</div>}
                         </div>
                     )}
                  </div>

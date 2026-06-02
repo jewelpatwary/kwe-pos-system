@@ -169,7 +169,7 @@ export default function Reports() {
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="bg-white border border-slate-200 text-slate-900 text-[9px] font-black rounded px-3 py-2 outline-none shadow-sm"
         >
-            <option value="all">ALL_CATEGORIES</option>
+            <option value="all">All Categories</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
@@ -180,19 +180,19 @@ export default function Reports() {
             onClick={() => setActiveTab('summary')}
             className={`px-3 py-1 rounded text-[8px] font-black tracking-widest transition-all ${activeTab === 'summary' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 '}`}
           >
-            SUMMARY_VIEW
+            Summary View
           </button>
           <button 
              onClick={() => setActiveTab('items')}
              className={`px-3 py-1 rounded text-[8px] font-black tracking-widest transition-all ${activeTab === 'items' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 '}`}
           >
-            ITEM_METRICS
+            Item Metrics
           </button>
           <button 
              onClick={() => setActiveTab('sales_by_category')}
              className={`px-3 py-1 rounded text-[8px] font-black tracking-widest transition-all ${activeTab === 'sales_by_category' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 '}`}
           >
-            SALES_BY_CATEGORY
+            Sales by Category
           </button>
         </div>
       </div>
@@ -200,7 +200,7 @@ export default function Reports() {
       <div className="flex-1 overflow-auto border-x border-slate-200 bg-white">
         {loading ? (
              <div className="flex items-center justify-center h-full">
-                <div className="animate-pulse tracking-[0.5em] text-slate-400 font-black">COMPILING_ANALYTICS_DATA...</div>
+                <div className="animate-pulse tracking-[0.5em] text-slate-400 font-black">Compiling Analytics Data...</div>
              </div>
         ) : reportData && (
           <table className="w-full text-left border-collapse">
@@ -208,25 +208,25 @@ export default function Reports() {
               <tr className="text-slate-500 bg-slate-50/80 backdrop-blur-md transition-colors">
                 {activeTab === 'summary' ? (
                   <>
-                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Identity_Vec</th>
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Cash_Trx</th>
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">TNG</th>
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Credit_Flow</th>
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Burn_Rate</th>
-                    <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Agg_Summation</th>
+                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Category Name</th>
+                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Cash</th>
+                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">TNG (E-Wallet)</th>
+                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Credit</th>
+                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Auto Burn</th>
+                    <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Total Sales</th>
                   </>
                 ) : activeTab === 'sales_by_category' ? (
                   <>
-                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Category_Name</th>
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Total_Quantity</th>
-                    <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Total_Value</th>
+                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Category Name</th>
+                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Total Quantity</th>
+                    <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Total Value</th>
                   </>
                 ) : (
                   <>
-                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Descriptor</th>
-                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Class_Vec</th>
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Volume</th>
-                    <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Value_Index</th>
+                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Product Name</th>
+                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Category</th>
+                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Quantity</th>
+                    <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Total Sales</th>
                   </>
                 )}
               </tr>
@@ -237,7 +237,7 @@ export default function Reports() {
                   <tr key={i} className="hover:bg-slate-50 transition-colors">
                     <td className="py-4 px-6 border-r border-slate-200 text-slate-900 font-black italic">{cat.category_name}</td>
                     <td className="py-4 px-6 border-r border-slate-200 text-center text-emerald-600 font-bold italic">{currency.symbol}{(cat.payments?.['CASH'] || 0).toFixed(2)}</td>
-                    <td className="py-4 px-6 border-r border-slate-200 text-center text-indigo-600 font-bold italic">{currency.symbol}{(cat.payments?.['ONLINE'] || 0).toFixed(2)}</td>
+                    <td className="py-4 px-6 border-r border-slate-200 text-center text-indigo-600 font-bold italic">{currency.symbol}{((cat.payments?.['ONLINE'] || 0) + (cat.payments?.['TNG'] || 0)).toFixed(2)}</td>
                     <td className="py-4 px-6 border-r border-slate-200 text-center text-indigo-600 font-bold italic bg-indigo-50">{currency.symbol}{(cat.payments?.['CREDIT'] || 0).toFixed(2)}</td>
                     <td className="py-4 px-6 border-r border-slate-200 text-center text-orange-600 font-bold italic">{currency.symbol}{(cat.payments?.['AUTO_BURN'] || 0).toFixed(2)}</td>
                     <td className="py-4 px-6 text-right text-slate-900 font-black italic bg-slate-100">{currency.symbol}{cat.total_value.toFixed(2)}</td>

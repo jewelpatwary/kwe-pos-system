@@ -53,7 +53,6 @@ export default function AdminLayout() {
       id: "inventory",
       label: "STOCK",
       items: [
-        { to: "/admin/inventory", label: "STOCK LEVEL", icon: PackageSearch },
         { to: "/admin/inventory-audit", label: "AUDIT", icon: ClipboardCheck },
         { to: "/admin/stock-adjustment", label: "ADJUSTMENT", icon: Database }
       ]

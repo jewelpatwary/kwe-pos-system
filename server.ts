@@ -49,220 +49,174 @@ const PI_EXT_FILE = path.join(DATA_DIR, 'purchase_invoice_ext.json');
 const EXPENSE_CATEGORIES_FILE = path.join(DATA_DIR, 'expense_categories.json');
 const SEED_LOCK_FILE = path.join(DATA_DIR, 'seed.lock');
 
-function readCategories2() {
-  try {
-    if (!fs.existsSync(CAT2_FILE)) return [];
-    return JSON.parse(fs.readFileSync(CAT2_FILE, 'utf-8'));
-  } catch (e) { return []; }
-}
-function writeCategories2(data: any) { 
-  try {
-    fs.writeFileSync(CAT2_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write Categories2 to local file:', e.message);
-  }
-}
+// --- ONLINE SETTINGS STORE (SUPABASE SYNC) ---
+const SETTINGS_KEYS = {
+  CAT2: 'data_categories2',
+  PROD_CAT2: 'data_product_mapping_category2',
+  PAYMENT_TYPES: 'data_payment_types',
+  INVOICE_CATEGORIES: 'data_invoice_categories',
+  PI_EXT: 'data_purchase_invoice_ext',
+  EXPENSE_CATEGORIES: 'data_expense_categories',
+  PROD_SALES_TYPE: 'data_product_sales_type',
+  PROD_STATUS: 'data_product_status',
+  CUSTOMER_AUTO_CREDIT: 'data_customer_auto_credit_product',
+  CUSTOMER_METADATA: 'data_customer_metadata',
+  PROD_MODIFIED: 'data_product_last_modified'
+};
 
-function readProductCategory2() {
-  try {
-    if (!fs.existsSync(PROD_CAT2_FILE)) return {};
-    return JSON.parse(fs.readFileSync(PROD_CAT2_FILE, 'utf-8'));
-  } catch (e) { return {}; }
-}
-function writeProductCategory2(data: any) { 
-  try {
-    fs.writeFileSync(PROD_CAT2_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write ProductCategory2 to local file:', e.message);
-  }
-}
-
-function readPaymentTypes() {
-  try {
-    if (!fs.existsSync(PAYMENT_TYPES_FILE)) {
-      const initial = [
-        { id: 1, name: 'Cash', status: 'active' },
-        { id: 2, name: 'Bank', status: 'active' },
-        { id: 3, name: 'Credit', status: 'active' }
-      ];
-      try {
-        fs.writeFileSync(PAYMENT_TYPES_FILE, JSON.stringify(initial, null, 2));
-      } catch (e) {}
-      return initial;
-    }
-    return JSON.parse(fs.readFileSync(PAYMENT_TYPES_FILE, 'utf-8'));
-  } catch (e) { return []; }
-}
-function writePaymentTypes(data: any) { 
-  try {
-    fs.writeFileSync(PAYMENT_TYPES_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write PaymentTypes to local file:', e.message);
-  }
-}
-
-function readInvoiceCategories() {
-  try {
-    if (!fs.existsSync(INVOICE_CATEGORIES_FILE)) {
-      const initial = [
-        { id: 1, name: 'Minimart', status: 'active' },
-        { id: 2, name: 'Canteen', status: 'active' }
-      ];
-      try {
-        fs.writeFileSync(INVOICE_CATEGORIES_FILE, JSON.stringify(initial, null, 2));
-      } catch (e) {}
-      return initial;
-    }
-    return JSON.parse(fs.readFileSync(INVOICE_CATEGORIES_FILE, 'utf-8'));
-  } catch (e) { return []; }
-}
-function writeInvoiceCategories(data: any) { 
-  try {
-    fs.writeFileSync(INVOICE_CATEGORIES_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write InvoiceCategories to local file:', e.message);
-  }
-}
-
-function readPIExt() {
-  try {
-    if (!fs.existsSync(PI_EXT_FILE)) {
-      try {
-        fs.writeFileSync(PI_EXT_FILE, JSON.stringify({}, null, 2));
-      } catch (e) {}
-      return {};
-    }
-    return JSON.parse(fs.readFileSync(PI_EXT_FILE, 'utf-8'));
-  } catch (e) { return {}; }
-}
-function writePIExt(data: any) { 
-  try {
-    fs.writeFileSync(PI_EXT_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write PIExt to local file:', e.message);
-  }
-}
-
-function readExpenseCategories() {
-  try {
-    if (!fs.existsSync(EXPENSE_CATEGORIES_FILE)) {
-      const initial: string[] = [];
-      try {
-        fs.writeFileSync(EXPENSE_CATEGORIES_FILE, JSON.stringify(initial, null, 2));
-      } catch (e) {}
-      return initial;
-    }
-    return JSON.parse(fs.readFileSync(EXPENSE_CATEGORIES_FILE, 'utf-8'));
-  } catch (e) { return []; }
-}
-function writeExpenseCategories(data: any) {
-  try {
-    fs.writeFileSync(EXPENSE_CATEGORIES_FILE, JSON.stringify(data, null, 2));
-  } catch (e) {
-    console.warn('Failed to write ExpenseCategories to local file:', e.message);
-  }
-}
-
-function readProductSalesType() {
-  try {
-    if (!fs.existsSync(PROD_SALES_TYPE_FILE)) {
-      try {
-        fs.writeFileSync(PROD_SALES_TYPE_FILE, JSON.stringify({}, null, 2));
-      } catch (e) {}
-      return {};
-    }
-    return JSON.parse(fs.readFileSync(PROD_SALES_TYPE_FILE, 'utf-8'));
-  } catch (e) { return {}; }
-}
-function writeProductSalesType(data: any) { 
-  try {
-    fs.writeFileSync(PROD_SALES_TYPE_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write ProductSalesType to local file:', e.message);
-  }
-}
-
-function readProductStatus() {
-  try {
-    if (!fs.existsSync(PROD_STATUS_FILE)) {
-      try {
-        fs.writeFileSync(PROD_STATUS_FILE, JSON.stringify({}, null, 2));
-      } catch (e) {}
-      return {};
-    }
-    return JSON.parse(fs.readFileSync(PROD_STATUS_FILE, 'utf-8'));
-  } catch (e) { return {}; }
-}
-function writeProductStatus(data: any) { 
-  try {
-    fs.writeFileSync(PROD_STATUS_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write ProductStatus to local file:', e.message);
-  }
-}
-
-function readCustomerAutoCreditProduct() {
-  try {
-    if (!fs.existsSync(PROD_AUTO_CREDIT_PRODUCT_FILE)) {
-      try {
-        fs.writeFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, JSON.stringify({}, null, 2));
-      } catch (e) {}
-      return {};
-    }
-    return JSON.parse(fs.readFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, 'utf-8'));
-  } catch (e) { return {}; }
-}
-function writeCustomerAutoCreditProduct(data: any) { 
-  try {
-    fs.writeFileSync(PROD_AUTO_CREDIT_PRODUCT_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write CustomerAutoCreditProduct to local file:', e.message);
-  }
-}
-
-function readCustomerMetadata() {
-  try {
-    if (!fs.existsSync(CUSTOMER_METADATA_FILE)) {
-      try {
-        fs.writeFileSync(CUSTOMER_METADATA_FILE, JSON.stringify({}, null, 2));
-      } catch (e) {}
-      return {};
-    }
-    return JSON.parse(fs.readFileSync(CUSTOMER_METADATA_FILE, 'utf-8'));
-  } catch (e) { return {}; }
-}
-function writeCustomerMetadata(data: any) { 
-  try {
-    fs.writeFileSync(CUSTOMER_METADATA_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write CustomerMetadata to local file:', e.message);
-  }
-}
-
-function readProductModified() {
-  try {
-    if (!fs.existsSync(PROD_MODIFIED_FILE)) {
-      try {
-        fs.writeFileSync(PROD_MODIFIED_FILE, JSON.stringify({}, null, 2));
-      } catch (e) {}
-      return {};
-    }
-    return JSON.parse(fs.readFileSync(PROD_MODIFIED_FILE, 'utf-8'));
-  } catch (e) { return {}; }
-}
-function writeProductModified(data: any) { 
-  try {
-    fs.writeFileSync(PROD_MODIFIED_FILE, JSON.stringify(data, null, 2)); 
-  } catch (e) {
-    console.warn('Failed to write ProductModified to local file:', e.message);
-  }
-}
+const settingsCache: { [key: string]: any } = {};
 
 // Proxy supabase to implement lazy initialization
 const supabase = {
   from: (table: string) => getSupabase().from(table),
   rpc: (fn: string, params: any) => getSupabase().rpc(fn, params),
 };
+
+async function syncSettingOnline(key: string, value: any) {
+  settingsCache[key] = value;
+  try {
+    const strValue = typeof value === 'string' ? value : JSON.stringify(value);
+    await supabase.from('settings').upsert({ key, value: strValue }, { onConflict: 'key' });
+  } catch (err) {
+    console.error(`[SYNC] Failed to push ${key} to Supabase:`, err);
+  }
+}
+
+async function initializeSettingsFromOnline() {
+  console.log('[INITIALIZE] Fetching settings from Supabase...');
+  try {
+    const { data, error } = await supabase.from('settings').select('key, value');
+    if (error) throw error;
+    if (data) {
+      data.forEach((item: any) => {
+        try {
+          const trimmed = (item.value || '').trim();
+          // Only auto-parse if it looks like JSON
+          if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+             settingsCache[item.key] = JSON.parse(trimmed);
+          } else {
+             settingsCache[item.key] = item.value;
+          }
+        } catch (e) {
+          settingsCache[item.key] = item.value;
+        }
+      });
+      console.log(`[INITIALIZE] Loaded ${data.length} settings from database.`);
+    }
+  } catch (err) {
+    console.error('[INITIALIZE] Fatal error loading settings:', err);
+  }
+}
+
+async function getSettingOnline(key: string, defaultValueRef: any) {
+  try {
+    const { data, error } = await supabase.from('settings').select('value').eq('key', key).single();
+    if (!error && data && data.value) {
+      try {
+        const parsed = JSON.parse(data.value.trim());
+        settingsCache[key] = parsed;
+        return parsed;
+      } catch (e) {
+        // failed parsing, use cache
+      }
+    }
+  } catch (err) {
+    console.error(`[DATABASE] Failed to read key ${key} from database:`, err);
+  }
+  return settingsCache[key] !== undefined ? settingsCache[key] : defaultValueRef;
+}
+
+async function readCategories2() {
+  return await getSettingOnline(SETTINGS_KEYS.CAT2, []);
+}
+
+async function readCategories2Async() {
+  return await readCategories2();
+}
+
+async function writeCategories2(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.CAT2, data);
+}
+
+async function readProductCategory2() {
+  return await getSettingOnline(SETTINGS_KEYS.PROD_CAT2, {});
+}
+async function writeProductCategory2(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.PROD_CAT2, data);
+}
+
+async function readPaymentTypes() {
+  const initial = [
+    { id: 1, name: 'Cash', status: 'active' },
+    { id: 2, name: 'Bank', status: 'active' },
+    { id: 3, name: 'Credit', status: 'active' }
+  ];
+  return await getSettingOnline(SETTINGS_KEYS.PAYMENT_TYPES, initial);
+}
+async function writePaymentTypes(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.PAYMENT_TYPES, data);
+}
+
+async function readInvoiceCategories() {
+  const initial = [
+    { id: 1, name: 'Minimart', status: 'active' },
+    { id: 2, name: 'Canteen', status: 'active' }
+  ];
+  return await getSettingOnline(SETTINGS_KEYS.INVOICE_CATEGORIES, initial);
+}
+async function writeInvoiceCategories(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.INVOICE_CATEGORIES, data);
+}
+
+async function readPIExt() {
+  return await getSettingOnline(SETTINGS_KEYS.PI_EXT, {});
+}
+async function writePIExt(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.PI_EXT, data);
+}
+
+async function readExpenseCategories() {
+  return await getSettingOnline(SETTINGS_KEYS.EXPENSE_CATEGORIES, []);
+}
+async function writeExpenseCategories(data: any) {
+  await syncSettingOnline(SETTINGS_KEYS.EXPENSE_CATEGORIES, data);
+}
+
+async function readProductSalesType() {
+  return await getSettingOnline(SETTINGS_KEYS.PROD_SALES_TYPE, {});
+}
+async function writeProductSalesType(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.PROD_SALES_TYPE, data);
+}
+
+async function readProductStatus() {
+  return await getSettingOnline(SETTINGS_KEYS.PROD_STATUS, {});
+}
+async function writeProductStatus(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.PROD_STATUS, data);
+}
+
+async function readCustomerAutoCreditProduct() {
+  return await getSettingOnline(SETTINGS_KEYS.CUSTOMER_AUTO_CREDIT, {});
+}
+async function writeCustomerAutoCreditProduct(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.CUSTOMER_AUTO_CREDIT, data);
+}
+
+async function readCustomerMetadata() {
+  return await getSettingOnline(SETTINGS_KEYS.CUSTOMER_METADATA, {});
+}
+async function writeCustomerMetadata(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.CUSTOMER_METADATA, data);
+}
+
+async function readProductModified() {
+  return await getSettingOnline(SETTINGS_KEYS.PROD_MODIFIED, {});
+}
+async function writeProductModified(data: any) { 
+  await syncSettingOnline(SETTINGS_KEYS.PROD_MODIFIED, data);
+}
+
 
 // Middleware to verify JWT
 const authenticateToken = (req: any, res: any, next: any) => {
@@ -323,7 +277,7 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   // Payment Types Endpoints
   app.get('/api/payment_types', async (req, res) => {
     try {
-      const data = readPaymentTypes();
+      const data = await readPaymentTypes();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -333,11 +287,11 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   app.post('/api/payment_types', authenticateToken, requireAdmin, async (req, res) => {
     const { name, status } = req.body;
     try {
-      const data = readPaymentTypes();
+      const data = await readPaymentTypes();
       const nextId = data.reduce((max: number, c: any) => Math.max(max, Number(c.id)), 0) + 1;
       const newItem = { id: nextId, name, statusValue: status || 'active', status: status || 'active' };
       data.push(newItem);
-      writePaymentTypes(data);
+      await writePaymentTypes(data);
       res.json({ success: true, id: nextId });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -348,11 +302,11 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const { id } = req.params;
     const { name, status } = req.body;
     try {
-      const data = readPaymentTypes();
+      const data = await readPaymentTypes();
       const idx = data.findIndex((c: any) => c.id.toString() === id.toString());
       if (idx !== -1) {
         data[idx] = { ...data[idx], name, status: status || data[idx].status };
-        writePaymentTypes(data);
+        await writePaymentTypes(data);
         res.json({ success: true });
       } else {
         res.status(404).json({ success: false, message: 'Payment type not found' });
@@ -365,9 +319,9 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   app.delete('/api/payment_types/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
-      const data = readPaymentTypes();
+      const data = await readPaymentTypes();
       const filtered = data.filter((c: any) => c.id.toString() !== id.toString());
-      writePaymentTypes(filtered);
+      await writePaymentTypes(filtered);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -377,7 +331,7 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   // Invoice Categories Endpoints
   app.get('/api/invoice_categories', async (req, res) => {
     try {
-      const data = readInvoiceCategories();
+      const data = await readInvoiceCategories();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -387,11 +341,11 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   app.post('/api/invoice_categories', authenticateToken, requireAdmin, async (req, res) => {
     const { name, status } = req.body;
     try {
-      const data = readInvoiceCategories();
+      const data = await readInvoiceCategories();
       const nextId = data.reduce((max: number, c: any) => Math.max(max, Number(c.id)), 0) + 1;
       const newItem = { id: nextId, name, status: status || 'active' };
       data.push(newItem);
-      writeInvoiceCategories(data);
+      await writeInvoiceCategories(data);
       res.json({ success: true, id: nextId });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -402,11 +356,11 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const { id } = req.params;
     const { name, status } = req.body;
     try {
-      const data = readInvoiceCategories();
+      const data = await readInvoiceCategories();
       const idx = data.findIndex((c: any) => c.id.toString() === id.toString());
       if (idx !== -1) {
         data[idx] = { ...data[idx], name, status: status || data[idx].status };
-        writeInvoiceCategories(data);
+        await writeInvoiceCategories(data);
         res.json({ success: true });
       } else {
         res.status(404).json({ success: false, message: 'Invoice category not found' });
@@ -419,9 +373,9 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   app.delete('/api/invoice_categories/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
-      const data = readInvoiceCategories();
+      const data = await readInvoiceCategories();
       const filtered = data.filter((c: any) => c.id.toString() !== id.toString());
-      writeInvoiceCategories(filtered);
+      await writeInvoiceCategories(filtered);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -431,7 +385,7 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   // Expense Categories Endpoints
   app.get('/api/expense_categories', async (req, res) => {
     try {
-      const data = readExpenseCategories();
+      const data = await readExpenseCategories();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -441,10 +395,10 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   app.post('/api/expense_categories', authenticateToken, requireAdmin, async (req, res) => {
     const { name } = req.body;
     try {
-      const data = readExpenseCategories();
+      const data = await readExpenseCategories();
       if (!data.includes(name)) {
         data.push(name);
-        writeExpenseCategories(data);
+        await writeExpenseCategories(data);
       }
       res.json({ success: true });
     } catch (error: any) {
@@ -455,11 +409,11 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   app.put('/api/expense_categories', authenticateToken, requireAdmin, async (req, res) => {
       const { oldName, newName } = req.body;
       try {
-          let data = readExpenseCategories();
+          let data = await readExpenseCategories();
           const idx = data.indexOf(oldName);
           if (idx !== -1) {
               data[idx] = newName;
-              writeExpenseCategories(data);
+              await writeExpenseCategories(data);
 
               // Also update categories in the supabase database to keep them consistent
               await supabase.from('expenses')
@@ -478,9 +432,9 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   app.delete('/api/expense_categories/:name', authenticateToken, requireAdmin, async (req, res) => {
     const { name } = req.params;
     try {
-      const data = readExpenseCategories();
+      const data = await readExpenseCategories();
       const filtered = data.filter((c: string) => c !== name);
-      writeExpenseCategories(filtered);
+      await writeExpenseCategories(filtered);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -1140,11 +1094,11 @@ app.post('/api/auth/login', async (req, res) => {
       }
 
       if (data) {
-        const cats2 = readCategories2();
-        const mappings = readProductCategory2();
-        const salesTypes = readProductSalesType();
-        const statusTypes = readProductStatus();
-        const modifiedTimes = readProductModified();
+        const cats2 = await readCategories2Async();
+        const mappings = await readProductCategory2();
+        const salesTypes = await readProductSalesType();
+        const statusTypes = await readProductStatus();
+        const modifiedTimes = await readProductModified();
         const cat2Id = mappings[data.id.toString()] || null;
         const cat2Obj = cat2Id ? cats2.find((c: any) => c.id.toString() === cat2Id.toString()) : null;
         data.category2_id = cat2Id ? Number(cat2Id) : null;
@@ -1179,11 +1133,11 @@ app.post('/api/auth/login', async (req, res) => {
       
       if (error) throw error;
       
-      const cats2 = readCategories2();
-      const mappings = readProductCategory2();
-      const salesTypes = readProductSalesType();
-      const statusTypes = readProductStatus();
-      const modifiedTimes = readProductModified();
+      const cats2 = await readCategories2Async();
+      const mappings = await readProductCategory2();
+      const salesTypes = await readProductSalesType();
+      const statusTypes = await readProductStatus();
+      const modifiedTimes = await readProductModified();
 
       // Transform to match SQLite structure
       const products = (data || []).map(p => {
@@ -1239,22 +1193,22 @@ app.post('/api/auth/login', async (req, res) => {
       const productId = data[0].id.toString();
 
       if (category2_id) {
-        const mappings = readProductCategory2();
+        const mappings = await readProductCategory2();
         mappings[productId] = category2_id.toString();
-        writeProductCategory2(mappings);
+        await writeProductCategory2(mappings);
       }
 
-      const salesTypes = readProductSalesType();
+      const salesTypes = await readProductSalesType();
       salesTypes[productId] = sales_type || 'Sales product';
-      writeProductSalesType(salesTypes);
+      await writeProductSalesType(salesTypes);
 
-      const statusTypes = readProductStatus();
+      const statusTypes = await readProductStatus();
       statusTypes[productId] = status || 'active';
-      writeProductStatus(statusTypes);
+      await writeProductStatus(statusTypes);
 
-      const modifiedMap = readProductModified();
+      const modifiedMap = await readProductModified();
       modifiedMap[productId] = new Date().toISOString();
-      writeProductModified(modifiedMap);
+      await writeProductModified(modifiedMap);
 
       res.json({ success: true, message: 'Product created', id: data[0].id });
     } catch (error: any) {
@@ -1295,33 +1249,33 @@ app.post('/api/auth/login', async (req, res) => {
 
       if (error) throw error;
       console.log(`Product ${id} updated successfully. is_credit_allowed saved:`, data?.[0]?.is_credit_allowed);
-      const mappings = readProductCategory2();
+      const mappings = await readProductCategory2();
       if (category2_id) {
         mappings[id.toString()] = category2_id.toString();
       } else {
         delete mappings[id.toString()];
       }
-      writeProductCategory2(mappings);
+      await writeProductCategory2(mappings);
 
-      const salesTypes = readProductSalesType();
+      const salesTypes = await readProductSalesType();
       if (sales_type) {
         salesTypes[id.toString()] = sales_type;
       } else {
         delete salesTypes[id.toString()];
       }
-      writeProductSalesType(salesTypes);
+      await writeProductSalesType(salesTypes);
 
-      const statusTypes = readProductStatus();
+      const statusTypes = await readProductStatus();
       if (status) {
         statusTypes[id.toString()] = status;
       } else {
         delete statusTypes[id.toString()];
       }
-      writeProductStatus(statusTypes);
+      await writeProductStatus(statusTypes);
 
-      const modifiedMap = readProductModified();
+      const modifiedMap = await readProductModified();
       modifiedMap[id.toString()] = new Date().toISOString();
-      writeProductModified(modifiedMap);
+      await writeProductModified(modifiedMap);
 
       res.json({ success: true, message: 'Product updated' });
     } catch (error: any) {
@@ -1406,10 +1360,10 @@ app.post('/api/auth/login', async (req, res) => {
       }
 
       // 3. Update local JSON metadata for the new products
-      const mappings = readProductCategory2();
-      const salesTypes = readProductSalesType();
-      const statusTypes = readProductStatus();
-      const modifiedMap = readProductModified();
+      const mappings = await readProductCategory2();
+      const salesTypes = await readProductSalesType();
+      const statusTypes = await readProductStatus();
+      const modifiedMap = await readProductModified();
       const now = new Date().toISOString();
 
       data.forEach((newProd: any) => {
@@ -1423,10 +1377,10 @@ app.post('/api/auth/login', async (req, res) => {
         }
       });
 
-      writeProductCategory2(mappings);
-      writeProductSalesType(salesTypes);
-      writeProductStatus(statusTypes);
-      writeProductModified(modifiedMap);
+      await writeProductCategory2(mappings);
+      await writeProductSalesType(salesTypes);
+      await writeProductStatus(statusTypes);
+      await writeProductModified(modifiedMap);
 
       res.json({ success: true, message: `Bulk import successful. ${data.length} products added.` });
     } catch (error: any) {
@@ -1640,7 +1594,7 @@ app.post('/api/auth/login', async (req, res) => {
   // Categories 2 Endpoints
   app.get('/api/categories2', async (req, res) => {
     try {
-      const data = readCategories2();
+      const data = await readCategories2Async();
       res.json({ success: true, data });
     } catch (error: any) {
       console.error('Local categories2 fetch error:', error);
@@ -1651,11 +1605,11 @@ app.post('/api/auth/login', async (req, res) => {
   app.post('/api/categories2', authenticateToken, requireAdmin, async (req, res) => {
     const { name, status } = req.body;
     try {
-      const data = readCategories2();
+      const data = await readCategories2Async();
       const nextId = data.reduce((max: number, c: any) => Math.max(max, Number(c.id)), 0) + 1;
       const newItem = { id: nextId, name, status: status || 'active' };
       data.push(newItem);
-      writeCategories2(data);
+      await syncSettingOnline(SETTINGS_KEYS.CAT2, data);
       res.json({ success: true, id: nextId });
     } catch (error: any) {
       console.error('Local categories2 insert error:', error);
@@ -1667,11 +1621,11 @@ app.post('/api/auth/login', async (req, res) => {
     const { id } = req.params;
     const { name, status } = req.body;
     try {
-      const data = readCategories2();
+      const data = await readCategories2Async();
       const idx = data.findIndex((c: any) => c.id.toString() === id.toString());
       if (idx !== -1) {
         data[idx] = { ...data[idx], name, status };
-        writeCategories2(data);
+        await syncSettingOnline(SETTINGS_KEYS.CAT2, data);
         res.json({ success: true });
       } else {
         res.status(404).json({ success: false, message: 'Category 2 not found' });
@@ -1685,9 +1639,9 @@ app.post('/api/auth/login', async (req, res) => {
   app.delete('/api/categories2/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
-      const data = readCategories2();
+      const data = await readCategories2Async();
       const filtered = data.filter((c: any) => c.id.toString() !== id.toString());
-      writeCategories2(filtered);
+      await syncSettingOnline(SETTINGS_KEYS.CAT2, filtered);
       res.json({ success: true });
     } catch (error: any) {
       console.error('Local categories2 delete error:', error);
@@ -2022,8 +1976,8 @@ app.post('/api/auth/login', async (req, res) => {
         });
       }
 
-      const autoCreditProductMappings = readCustomerAutoCreditProduct();
-      const metadataMappings = readCustomerMetadata();
+      const autoCreditProductMappings = await readCustomerAutoCreditProduct();
+      const metadataMappings = await readCustomerMetadata();
 
       const mergedData = (customersData || []).map((c: any) => {
         const meta = metadataMappings[String(c.id)] || {};
@@ -2121,18 +2075,18 @@ app.post('/api/auth/login', async (req, res) => {
       
       if (error) throw error;
       
-      const metadataMappings = readCustomerMetadata();
+      const metadataMappings = await readCustomerMetadata();
       metadataMappings[data[0].id.toString()] = {
         daily_limit_mode: daily_limit_mode || 'AUTO',
         total_pax: Number(total_pax || 1),
         total_monthly_limit: Number(total_monthly_limit || 0)
       };
-      writeCustomerMetadata(metadataMappings);
+      await writeCustomerMetadata(metadataMappings);
 
       if (auto_credit_product_id) {
-        const mappings = readCustomerAutoCreditProduct();
+        const mappings = await readCustomerAutoCreditProduct();
         mappings[data[0].id.toString()] = auto_credit_product_id.toString();
-        writeCustomerAutoCreditProduct(mappings);
+        await writeCustomerAutoCreditProduct(mappings);
       }
       
       res.json({ success: true, message: 'Customer added', id: data[0].id });
@@ -2170,21 +2124,21 @@ app.post('/api/auth/login', async (req, res) => {
 
       if (error) throw error;
       
-      const metadataMappings = readCustomerMetadata();
+      const metadataMappings = await readCustomerMetadata();
       metadataMappings[id.toString()] = {
         daily_limit_mode: daily_limit_mode || 'AUTO',
         total_pax: Number(total_pax || 1),
         total_monthly_limit: Number(total_monthly_limit || 0)
       };
-      writeCustomerMetadata(metadataMappings);
+      await writeCustomerMetadata(metadataMappings);
 
-      const mappings = readCustomerAutoCreditProduct();
+      const mappings = await readCustomerAutoCreditProduct();
       if (auto_credit_product_id) {
         mappings[id.toString()] = auto_credit_product_id.toString();
       } else {
         delete mappings[id.toString()];
       }
-      writeCustomerAutoCreditProduct(mappings);
+      await writeCustomerAutoCreditProduct(mappings);
       
       res.json({ success: true, message: 'Customer updated' });
     } catch (error: any) {
@@ -2407,6 +2361,50 @@ app.post('/api/auth/login', async (req, res) => {
     }
   });
 
+  app.get('/api/settings/theme', authenticateToken, async (req, res) => {
+    try {
+      const { data: settings, error } = await supabase
+        .from('settings')
+        .select('key, value')
+        .in('key', ['font_family', 'font_size', 'currency_code', 'date_format', 'tax_rate', 'timezone']);
+      
+      if (error) throw error;
+      
+      const data: any = {};
+      (settings || []).forEach((s: any) => data[s.key] = s.value);
+      res.json({ success: true, data });
+    } catch (error: any) {
+      console.error('Supabase fetch theme settings error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post('/api/settings/theme', authenticateToken, requireAdmin, async (req, res) => {
+    const { font_family, font_size, currency_code, date_format, tax_rate, timezone } = req.body;
+    try {
+      const updates = [
+        { key: 'font_family', value: font_family },
+        { key: 'font_size', value: font_size },
+        { key: 'currency_code', value: currency_code },
+        { key: 'date_format', value: date_format },
+        { key: 'tax_rate', value: tax_rate },
+        { key: 'timezone', value: timezone }
+      ].filter(u => u.value !== undefined);
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('settings')
+          .upsert(update, { onConflict: 'key' });
+        if (error) throw error;
+      }
+
+      res.json({ success: true, message: 'Theme settings updated' });
+    } catch (error: any) {
+      console.error('Supabase settings update error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Store Profile Settings
   app.get('/api/settings/store', authenticateToken, async (req, res) => {
     try {
@@ -2435,7 +2433,7 @@ app.post('/api/auth/login', async (req, res) => {
         { key: 'registration_number', value: registration_number },
         { key: 'address', value: address },
         { key: 'phone_number', value: phone_number }
-      ].filter(u => u.value);
+      ].filter(u => u.value !== undefined);
 
       for (const update of updates) {
         const { error } = await supabase
@@ -2689,7 +2687,7 @@ app.post('/api/auth/login', async (req, res) => {
 
         // Process AUTO_BURN for active customers
         const { data: customersWithUnused } = await supabase.from('customers').select('id, name, daily_limit, daily_used, member_type').eq('credit_status', 'ACTIVE');
-        const autoCreditMappings = readCustomerAutoCreditProduct();
+        const autoCreditMappings = await readCustomerAutoCreditProduct();
         
         for (const c of (customersWithUnused || [])) {
           let burned = (c.daily_limit || 0) - (c.daily_used || 0);
@@ -3216,10 +3214,10 @@ app.post('/api/auth/login', async (req, res) => {
 
       if (error) throw error;
 
-      const cats2 = readCategories2();
-      const mappings = readProductCategory2();
-      const salesTypes = readProductSalesType();
-      const modifiedTimes = readProductModified();
+      const cats2 = await readCategories2Async();
+      const mappings = await readProductCategory2();
+      const salesTypes = await readProductSalesType();
+      const modifiedTimes = await readProductModified();
 
       const mapped = (products || []).map(p => {
         const cat2Id = mappings[p.id.toString()] || null;
@@ -3934,11 +3932,14 @@ app.post('/api/auth/login', async (req, res) => {
       
       if (iErr) throw iErr;
       
-      const formattedItems = (items || []).map((i: any) => ({
-        ...i,
-        name: i.products?.name,
-        barcode: i.products?.barcode
-      }));
+      const formattedItems = (items || []).map((i: any) => {
+        const prod = Array.isArray(i.products) ? i.products[0] : i.products;
+        return {
+          ...i,
+          name: prod?.name || 'Unknown Item',
+          barcode: prod?.barcode || ''
+        };
+      });
 
       res.json({ success: true, data: { ...session, creator_name: session.users?.username, items: formattedItems } });
     } catch (error: any) {
@@ -4111,9 +4112,9 @@ app.post('/api/auth/login', async (req, res) => {
 
       if (error) throw error;
       
-      const piExt = readPIExt();
-      const invCats = readInvoiceCategories();
-      const pmTypes = readPaymentTypes();
+      const piExt = await readPIExt();
+      const invCats = await readInvoiceCategories();
+      const pmTypes = await readPaymentTypes();
 
       const formatted = (data || []).map((pi: any) => {
         const ext = piExt[pi.id.toString()] || {};
@@ -4156,9 +4157,9 @@ app.post('/api/auth/login', async (req, res) => {
       const invoiceId = invoice.id;
 
       // Save extension metadata
-      const piExt = readPIExt();
+      const piExt = await readPIExt();
       piExt[invoiceId.toString()] = { payment_type_id, invoice_category_id };
-      writePIExt(piExt);
+      await writePIExt(piExt);
 
       // Record initial payment if any
       if (paid_amount > 0) {
@@ -4239,8 +4240,8 @@ app.post('/api/auth/login', async (req, res) => {
         .eq('invoice_id', req.params.id)
         .order('created_at', { ascending: false });
 
-      const cats2 = readCategories2();
-      const prodCat2Mappings = readProductCategory2();
+      const cats2 = await readCategories2Async();
+      const prodCat2Mappings = await readProductCategory2();
 
       const formattedItems = (items || []).map((it: any) => {
         const cat2Id = prodCat2Mappings[it.product_id?.toString()] || null;
@@ -4254,10 +4255,10 @@ app.post('/api/auth/login', async (req, res) => {
         };
       });
 
-      const piExt = readPIExt();
+      const piExt = await readPIExt();
       const ext = piExt[req.params.id] || {};
-      const invCats = readInvoiceCategories();
-      const pmTypes = readPaymentTypes();
+      const invCats = await readInvoiceCategories();
+      const pmTypes = await readPaymentTypes();
       
       const cat = invCats.find((c: any) => c.id.toString() === (ext.invoice_category_id || '').toString());
       const pType = pmTypes.find((t: any) => t.id.toString() === (ext.payment_type_id || '').toString());
@@ -4361,9 +4362,9 @@ app.post('/api/auth/login', async (req, res) => {
       if (oldInvoice.status === 'VOID') throw new Error('Cannot edit voided invoice');
 
       // Update extension metadata
-      const piExt = readPIExt();
+      const piExt = await readPIExt();
       piExt[req.params.id.toString()] = { payment_type_id, invoice_category_id };
-      writePIExt(piExt);
+      await writePIExt(piExt);
 
       const { data: oldItems, error: itErr } = await supabase.from('purchase_invoice_items').select('*').eq('invoice_id', req.params.id);
       if (itErr) throw itErr;
@@ -4579,12 +4580,20 @@ app.post('/api/auth/login', async (req, res) => {
       const { data: adjustments, error } = await query;
       if (error) throw error;
 
-      const formatted = (adjustments || []).map((sa: any) => ({
-        ...sa,
-        product_name: sa.products?.name,
-        barcode: sa.products?.barcode,
-        created_by_name: sa.users?.username
-      }));
+      const formatted = (adjustments || []).map((sa: any) => {
+        let virtualInvId = sa.inventory_item_id;
+        if (!virtualInvId && sa.note) {
+          const match = sa.note.match(/\[INV_ITEM_REF:(\d+)\]/);
+          if (match) virtualInvId = parseInt(match[1]);
+        }
+        return {
+          ...sa,
+          inventory_item_id: virtualInvId,
+          product_name: sa.products?.name,
+          barcode: sa.products?.barcode,
+          created_by_name: sa.users?.username
+        };
+      });
 
       res.json({ success: true, data: formatted });
     } catch (error: any) {
@@ -4606,10 +4615,14 @@ app.post('/api/auth/login', async (req, res) => {
       if (inventory_item_id) {
         const { data: existingAdjust, error: eErr } = await supabase
           .from('stock_adjustments')
-          .select('id')
-          .eq('inventory_item_id', inventory_item_id);
+          .select('id, note')
+          .filter('note', 'ilike', `%[INV_ITEM_REF:${inventory_item_id}]%`);
         
-        if (eErr) throw eErr;
+        if (eErr && !eErr.message?.includes('column "inventory_item_id" does not exist')) {
+           // If the error is NOT about the missing column, throw it
+           throw eErr;
+        }
+
         if (existingAdjust && existingAdjust.length > 0) {
           throw new Error('This inventory item has already been adjusted.');
         }
@@ -4639,14 +4652,17 @@ app.post('/api/auth/login', async (req, res) => {
         adjustment_type,
         quantity: parseFloat(quantity),
         reason,
-        note: note || '',
+        note: (note || '') + (inventory_item_id ? ` [INV_ITEM_REF:${inventory_item_id}]` : ''),
         previous_stock: prevStock,
         new_stock: newStock,
         buying_price: product.purchase_price,
         created_by: userId
       };
 
-      if (inventory_item_id) payload.inventory_item_id = inventory_item_id;
+      // We explicitly skip payload.inventory_item_id if the client knows it doesn't exist
+      // But we can try to include it if we want to support both paths. 
+      // However, the error message clearly says it doesn't exist, so we skip it to avoid the crash.
+      // if (inventory_item_id) payload.inventory_item_id = inventory_item_id;
 
       const { data: adjustmentData, error: adjErr } = await supabase.from('stock_adjustments').insert([payload]).select().single();
 
@@ -5101,6 +5117,9 @@ app.post('/api/auth/login', async (req, res) => {
 
   // --- VITE MIDDLEWARE (Must be after API routes) ---
   async function runServer() {
+    // LOAD ONLINE SETTINGS BEFORE STARTING SERVER
+    await initializeSettingsFromOnline();
+    
     const PORT = 3000;
     if (process.env.VERCEL !== '1') {
       if (process.env.NODE_ENV !== 'production') {
