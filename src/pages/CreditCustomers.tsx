@@ -58,7 +58,7 @@ export default function CreditCustomers() {
 
   const fetchCustomers = async () => {
     try {
-      setLoading(true);
+      /* setLoading removed to prevent flicker */
       const res = await fetch('/api/customers?type=WALKIN', { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
       if (data.success) {
@@ -84,7 +84,7 @@ export default function CreditCustomers() {
   const confirmDeleteCustomer = async () => {
     if (!customerToDelete) return;
     try {
-      setLoading(true);
+      /* setLoading removed to prevent flicker */
       const res = await fetch(`/api/customers/${customerToDelete}`, { 
           method: 'DELETE', 
           headers: { 'Authorization': `Bearer ${token}` } 

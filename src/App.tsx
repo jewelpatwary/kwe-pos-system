@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './components/ThemeProvider';
 import POS from './pages/POS';
@@ -29,6 +29,7 @@ import SalesReport from './pages/SalesReport';
 import ProfitReport from './pages/ProfitReport';
 import ExpiryInsights from './pages/ExpiryInsights';
 import Login from './pages/Login';
+import ShopSelect from './pages/ShopSelect';
 import CreditCustomers from './pages/CreditCustomers';
 import CreditCollections from './pages/CreditCollections';
 import CreditEngine from './pages/CreditEngine';
@@ -36,21 +37,30 @@ import PurchasePaymentPage from './pages/PurchasePaymentPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
+  const [activeShop, setActiveShop] = useState<string | null>(localStorage.getItem('activeShop'));
+
   useEffect(() => {
     document.title = "KWE POS System";
   }, []);
 
+  const handleShopSelect = () => {
+    setActiveShop(localStorage.getItem('activeShop'));
+  };
+
   return (
     <ThemeProvider>
       <BrowserRouter>
-        <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-        
-        {/* Cashier / General Routes */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/pos" element={<POS />} />
-        </Route>
+        {!activeShop ? (
+          <ShopSelect onShopSelect={handleShopSelect} />
+        ) : (
+          <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/login" element={<Login />} />
+            
+            {/* Cashier / General Routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/pos" element={<POS />} />
+            </Route>
         
         {/* Admin / Manager Routes */}
         <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']} />}>
@@ -93,7 +103,8 @@ function App() {
           </Route>
         </Route>
       </Routes>
-    </BrowserRouter>
+        )}
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

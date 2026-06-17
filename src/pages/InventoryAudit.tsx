@@ -53,7 +53,7 @@ export default function InventoryAudit() {
   const [sessions, setSessions] = useState<InventorySession[]>([]);
   const [activeSession, setActiveSession] = useState<InventorySession | null>(null);
   const [sessionItems, setSessionItems] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [view, setView] = useState<'list' | 'editor'>('list');
   const [adjustments, setAdjustments] = useState<any[]>([]);
@@ -233,7 +233,7 @@ export default function InventoryAudit() {
 
   const startNewSession = async () => {
     try {
-      setLoading(true);
+      /* setLoading removed to prevent flicker */
       const res = await fetch('/api/admin/inventory/sessions', {
         method: 'POST',
         headers: { 

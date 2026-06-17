@@ -91,7 +91,7 @@ export default function PurchaseManagement() {
   };
 
   const fetchInvoiceDetails = async (id: number) => {
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const res = await fetch(`/api/admin/purchase-invoices/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -207,6 +207,7 @@ export default function PurchaseManagement() {
         },
         body: JSON.stringify({
           ...newInvoice,
+          paid_amount: newInvoice.payment_type_id === '1' ? totalAmount : 0,
           total_amount: totalAmount
         })
       });
@@ -372,14 +373,15 @@ export default function PurchaseManagement() {
                    />
                 </div>
                 <div>
-                   <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Invoice Category</label>
+                   <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Payment Type</label>
                    <select 
-                      value={newInvoice.invoice_category_id}
-                      onChange={(e) => setNewInvoice({ ...newInvoice, invoice_category_id: e.target.value })}
+                      value={newInvoice.payment_type_id}
+                      onChange={(e) => setNewInvoice({ ...newInvoice, payment_type_id: e.target.value })}
                       className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-all"
-                   >
-                     <option value="">Select Category...</option>
-                     {invoiceCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                    >
+                      <option value="">Select Payment Type...</option>
+                      <option value="1">Cash paid</option>
+                      <option value="3">Credit</option>
                    </select>
                 </div>
             </div>
@@ -466,28 +468,46 @@ export default function PurchaseManagement() {
                 </div>
             </div>
 
-            {/* Bottom Actions/Payment */}
-            <div className="flex justify-end gap-6 bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
-                {view === 'create' && (
-                  <div className="text-right">
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Paid Amount</label>
-                      <input 
-                        type="number"
-                        value={newInvoice.paid_amount}
-                        onChange={(e) => setNewInvoice({ ...newInvoice, paid_amount: parseFloat(e.target.value) || 0 })}
-                        className="w-48 bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-right font-medium focus:border-indigo-500 outline-none"
-                      />
-                  </div>
-                )}
-                <div className="text-right">
-                    <label className={view === 'edit' ? "block text-xs font-semibold text-slate-500 mb-1" : "block text-xs font-semibold text-red-500 mb-1"}>
-                      {view === 'edit' ? 'Total Amount' : 'Balance Due'}
-                    </label>
-                    <div className={view === 'edit' ? "text-2xl font-bold text-slate-900 px-3 py-1" : "text-2xl font-bold text-red-600 px-3 py-1"}>
-                      {currency.symbol}{view === 'edit' ? totalAmount.toFixed(2) : (totalAmount - newInvoice.paid_amount).toFixed(2)}
-                    </div>
-                </div>
-            </div>
+                                      {/* Bottom Actions/Payment */}
+             <div className="flex justify-end gap-6 bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
+                 <div className="text-right">
+                     <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Total Amount</label>
+                     <div className="text-2xl font-bold text-slate-900 px-3 py-1">
+                       {currency.symbol}{totalAmount.toFixed(2)}
+                     </div>
+                 </div>
+                 {newInvoice.payment_type_id === '1' ? (
+                   <>
+                     <div className="text-right border-l pl-6 border-slate-100">
+                         <label className="block text-xs font-semibold text-emerald-600 mb-1 uppercase tracking-wider">Auto Paid Amount</label>
+                         <div className="text-2xl font-bold text-emerald-600 px-3 py-1">
+                           {currency.symbol}{totalAmount.toFixed(2)}
+                         </div>
+                     </div>
+                     <div className="text-right border-l pl-6 border-slate-100">
+                         <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Balance Due</label>
+                         <div className="text-2xl font-bold text-slate-400 px-3 py-1">
+                           {currency.symbol}0.00
+                         </div>
+                     </div>
+                   </>
+                 ) : (
+                   <>
+                     <div className="text-right border-l pl-6 border-slate-100">
+                         <label className="block text-xs font-semibold text-indigo-500 mb-1 uppercase tracking-wider">Paid Amount</label>
+                         <div className="text-2xl font-bold text-indigo-600 px-3 py-1">
+                           {currency.symbol}{view === 'edit' ? newInvoice.paid_amount.toFixed(2) : '0.00'}
+                         </div>
+                     </div>
+                     <div className="text-right border-l pl-6 border-slate-100">
+                         <label className="block text-xs font-semibold text-rose-500 mb-1 uppercase tracking-wider">Balance Due</label>
+                         <div className="text-2xl font-bold text-rose-600 px-3 py-1">
+                           {currency.symbol}{(view === 'edit' ? (totalAmount - newInvoice.paid_amount) : totalAmount).toFixed(2)}
+                         </div>
+                     </div>
+                   </>
+                 )}
+             </div>
 
           </div>
         </div>
@@ -554,7 +574,19 @@ export default function PurchaseManagement() {
                 <div className="bg-white border border-slate-200 rounded flex flex-col overflow-hidden shadow-sm">
                     <div className="p-2 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                         <span className="font-black text-slate-400">Payment Status Log</span>
-                        <span className={`text-[9px] font-black italic px-2 py-0.5 rounded border shadow-sm ${selectedInvoice.payment_status === 'PAID' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-orange-50 border-orange-200 text-orange-600'}`}>{selectedInvoice.payment_status}</span>
+                        <span className={`text-[9px] font-black italic px-2 py-0.5 rounded border shadow-sm ${
+  selectedInvoice.payment_status === 'PAID'
+    ? (selectedInvoice.payment_type === 'Cash' || selectedInvoice.payment_type === 'Cash paid' || selectedInvoice.payment_type_id?.toString() === '1'
+        ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+        : 'bg-teal-50 border-teal-200 text-teal-600')
+    : 'bg-amber-50 border-amber-200 text-amber-600'
+}`}>
+  {selectedInvoice.payment_status === 'PAID'
+    ? (selectedInvoice.payment_type === 'Cash' || selectedInvoice.payment_type === 'Cash paid' || selectedInvoice.payment_type_id?.toString() === '1'
+        ? 'AUTO PAID'
+        : 'PAID')
+    : 'DUE'}
+</span>
                     </div>
                     <div className="p-4 space-y-2 bg-white">
                         {selectedInvoice.payments.map((p: any) => (
@@ -614,6 +646,7 @@ export default function PurchaseManagement() {
                         <div className="flex justify-between font-black"><span className="text-slate-400">Supplier</span> <span className="text-slate-900">{selectedInvoice.supplier_name}</span></div>
                         <div className="flex justify-between font-black"><span className="text-slate-400">Phone</span> <span className="text-slate-900">{selectedInvoice.supplier_phone || 'N/A'}</span></div>
                         <div className="flex justify-between font-black"><span className="text-slate-400">Invoice Date</span> <span className="text-slate-900">{new Date(selectedInvoice.date).toLocaleDateString()}</span></div>
+                        <div className="flex justify-between font-black"><span className="text-slate-400">Payment Type</span> <span className="text-indigo-600 font-extrabold">{selectedInvoice.payment_type === 'Cash' ? 'Cash paid' : (selectedInvoice.payment_type || 'N/A')}</span></div>
 
                     </div>
                 </div>
@@ -674,7 +707,6 @@ export default function PurchaseManagement() {
                     <th className="py-3 px-6 border-r border-slate-200 font-black">Invoice Number</th>
                     <th className="py-3 px-6 border-r border-slate-200 font-black">Supplier</th>
                     <th className="py-3 px-6 border-r border-slate-200 font-black">Date</th>
-                    <th className="py-3 px-6 border-r border-slate-200 font-black">Invoice Category</th>
                     <th className="py-3 px-6 border-r border-slate-200 font-black">Payment Type</th>
                     <th className="py-3 px-6 border-r border-slate-200 font-black">Total Price</th>
                     <th className="py-3 px-6 border-r border-slate-200 font-black">Payment Status</th>
@@ -688,16 +720,25 @@ export default function PurchaseManagement() {
                         <td className="py-3 px-6 border-r border-slate-100 font-bold text-slate-500 truncate max-w-xs">{inv.supplier_name}</td>
                         <td className="py-3 px-6 border-r border-slate-100 text-slate-400 font-black tracking-widest">{new Date(inv.date).toLocaleDateString()}</td>
                         <td className="py-3 px-6 border-r border-slate-100 text-slate-700 font-bold">
-                            {inv.category_name || 'N/A'}
-                        </td>
-                        <td className="py-3 px-6 border-r border-slate-100 text-slate-700 font-bold">
-                            {inv.payment_type || 'N/A'}
+                            {inv.payment_type === 'Cash' ? 'Cash paid' : (inv.payment_type || 'N/A')}
                         </td>
                         <td className="py-3 px-6 border-r border-slate-100">
                             <div className="text-slate-900 font-black italic underline decoration-indigo-200 underline-offset-4">{currency.symbol}{inv.total_amount.toFixed(2)}</div>
                         </td>
                         <td className="py-3 px-6 border-r border-slate-100">
-                            <span className={`text-[8px] font-black px-2 py-0.5 rounded border shadow-sm transition-colors ${inv.payment_status === 'PAID' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-orange-50 border-orange-200 text-orange-600'}`}>{inv.payment_status}</span>
+                            <span className={`text-[8px] font-black px-2 py-0.5 rounded border shadow-sm transition-all ${
+  inv.payment_status === 'PAID'
+    ? (inv.payment_type === 'Cash' || inv.payment_type === 'Cash paid' || inv.payment_type_id?.toString() === '1'
+        ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+        : 'bg-teal-50 border-teal-200 text-teal-600')
+    : 'bg-amber-50 border-amber-200 text-amber-600'
+}`}>
+  {inv.payment_status === 'PAID'
+    ? (inv.payment_type === 'Cash' || inv.payment_type === 'Cash paid' || inv.payment_type_id?.toString() === '1'
+        ? 'AUTO PAID'
+        : 'PAID')
+    : 'DUE'}
+</span>
                         </td>
                         <td className="py-3 px-6 text-right">
                             <div className="flex items-center justify-end gap-1.5">
@@ -715,7 +756,7 @@ export default function PurchaseManagement() {
                     </tr>
                 ))}
                 {invoices.length === 0 && (
-                    <tr><td colSpan={8} className="py-20 text-center font-black text-slate-300 tracking-[0.5em] grayscale italic select-none">No invoices found</td></tr>
+                    <tr><td colSpan={7} className="py-20 text-center font-black text-slate-300 tracking-[0.5em] grayscale italic select-none">No invoices found</td></tr>
                 )}
             </tbody>
         </table>

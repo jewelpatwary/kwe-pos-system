@@ -60,18 +60,28 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch('/api/settings/theme', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        const result = await res.json();
-        if (result.success && result.data) {
-          const { font_family, font_size, currency_code, date_format, tax_rate, timezone } = result.data;
-          if (font_family) setFontFamilyState(font_family);
-          if (font_size && ['sm', 'base', 'lg'].includes(font_size)) setFontSizeState(font_size as FontSize);
-          if (currency_code) {
-            const found = CURRENCIES.find(c => c.code === currency_code);
-            if (found) setCurrencyState(found);
+        
+        if (!res.ok) {
+           if (res.status === 401 || res.status === 403) {
+             useAuthStore.getState().logout();
+           }
+        }
+        
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const result = await res.json();
+          if (result.success && result.data) {
+            const { font_family, font_size, currency_code, date_format, tax_rate, timezone } = result.data;
+            if (font_family) setFontFamilyState(font_family);
+            if (font_size && ['sm', 'base', 'lg'].includes(font_size)) setFontSizeState(font_size as FontSize);
+            if (currency_code) {
+              const found = CURRENCIES.find(c => c.code === currency_code);
+              if (found) setCurrencyState(found);
+            }
+            if (date_format) setDateFormatState(date_format);
+            if (tax_rate) setTaxRateState(parseFloat(tax_rate));
+            if (timezone) setTimezoneState(timezone);
           }
-          if (date_format) setDateFormatState(date_format);
-          if (tax_rate) setTaxRateState(parseFloat(tax_rate));
-          if (timezone) setTimezoneState(timezone);
         }
       } catch (err) {
         console.error('Failed to fetch theme settings:', err);

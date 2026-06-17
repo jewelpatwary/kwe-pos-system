@@ -6,7 +6,7 @@ import { useProductStore } from '../store/productStore';
 import { 
   Search, ShoppingCart, Trash2, CreditCard, Banknote, ScanBarcode, 
   Undo2, LogOut, Tag, Ban, Plus, PackageSearch, Star, X, FileText, Settings,
-  Wifi, WifiOff, CloudOff
+  CloudOff, Calendar
 } from 'lucide-react';
 import CustomerReturnModal from '../components/CustomerReturnModal';
 import OptionsModal from '../components/OptionsModal';
@@ -106,6 +106,29 @@ export default function POS() {
   const fontSizeClass = posFontSize === '10px' ? 'text-[10px]' : 
                         posFontSize === '12px' ? 'text-[12px]' : 
                         posFontSize === '14px' ? 'text-[14px]' : 'text-[16px]';
+
+  const [salesDate, setSalesDate] = useState<string>(() => {
+    const local = new Date();
+    const yyyy = local.getFullYear();
+    const mm = String(local.getMonth() + 1).padStart(2, '0');
+    const dd = String(local.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+
+  const getSelectedSalesTimestamp = () => {
+    const now = new Date();
+    const [year, month, day] = salesDate.split('-').map(Number);
+    const targetDate = new Date(
+      year,
+      month - 1,
+      day,
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds()
+    );
+    return targetDate.toISOString();
+  };
 
   const [onlineStatus, setOnlineStatus] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
@@ -525,6 +548,7 @@ export default function POS() {
       return;
     }
 
+    const selectedTimestamp = getSelectedSalesTimestamp();
     const tempSaleId = `POS-${Date.now()}`;
     const initialReceipt = {
       saleId: tempSaleId,
@@ -536,7 +560,7 @@ export default function POS() {
       customer: selectedCustomer,
       received: details?.receivedAmount,
       change: details?.changeAmount || 0,
-      date: new Date().toLocaleString(),
+      date: new Date(selectedTimestamp).toLocaleString(),
       isPendingSync: true
     };
 
@@ -558,6 +582,7 @@ export default function POS() {
       payment_method: method,
       discount_amount: checkoutDiscount + checkoutReturnCredit,
       customer_id: checkoutCustomer?.id || null,
+      created_at: selectedTimestamp,
       ...details
     };
 
@@ -632,13 +657,15 @@ export default function POS() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className={`px-2 py-1 rounded border flex items-center gap-1 font-bold text-[8px] tracking-widest ${
-              onlineStatus 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-600' 
-                : 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse'
-            }`} title="Connection Status">
-              {onlineStatus ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
-              <span>{onlineStatus ? 'ONLINE' : 'OFFLINE'}</span>
+            {/* BACKDATED SALES DATE SELECTOR */}
+            <div className="relative flex items-center justify-center bg-white p-1.5 rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer" title={`OVERRIDE SALES DATE: ${salesDate}`}>
+              <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+              <input 
+                type="date"
+                value={salesDate}
+                onChange={(e) => setSalesDate(e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
             </div>
 
             <button 

@@ -15,7 +15,7 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     try {
-      setLoading(true);
+      /* setLoading removed to prevent flicker */
       const res = await fetch('/api/users', {
         headers: { Authorization: `Bearer ${token}` }
       });

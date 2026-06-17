@@ -458,3 +458,8 @@ ALTER TABLE public.sales_return_items ADD COLUMN IF NOT EXISTS created_at TIMEST
 ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.purchase_invoice_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
+-- Seed initial admin user if not exists (using bcrypt hash for 'admin123')
+INSERT INTO public.users (username, password, role)
+VALUES ('admin', '$2a$10$tZ216JDB4XvH7A5tDk.zR.9xS1/XvY1G1C2M2Z2U2V2/3YlqV1Vv.', 'ADMIN')
+ON CONFLICT (username) DO NOTHING;
+

@@ -8,13 +8,45 @@ import {
   Sun, Moon, User, History, Coffee, RefreshCcw
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-// No line needed here
+import { prefetchAPI } from '../main';
 
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (token && user) {
+        // Pre-fetch critical endpoints so pages load instantly on clicking
+        const today = new Date().toISOString().split('T')[0];
+        
+        const endpointsToPrefetch = [
+           '/api/products',
+           '/api/categories',
+           '/api/brands',
+           '/api/suppliers',
+           '/api/customers?type=MEMBERS_DELIVERY_FOOD',
+           '/api/customers?type=MEMBERS_WALK_IN',
+           '/api/credit-collections',
+           '/api/credit-engine',
+           '/api/purchase-invoices',
+           '/api/purchase-payments',
+           '/api/users',
+           '/api/settings',
+           '/api/admin/dashboard',
+           '/api/inventory-audits',
+           '/api/expenses',
+           `/api/admin/detailed-sales-report-rows?start_date=${today}&end_date=${today}&category_id=all`,
+           `/api/admin/daily-pdf-report?month=${today.substring(0,7)}`
+        ];
+
+        // Trigger prefetching with small delay to allow main render to finish
+        setTimeout(() => {
+            endpointsToPrefetch.forEach(url => prefetchAPI(url, token));
+        }, 500);
+    }
+  }, [token, user]);
 
   const handleLogout = () => {
     logout();

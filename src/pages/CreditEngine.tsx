@@ -44,7 +44,7 @@ export default function CreditEngine() {
 
   const handleCreateConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const res = await fetch('/api/admin/auto-sale-config', {
         method: 'POST',

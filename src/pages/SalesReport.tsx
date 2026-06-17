@@ -42,7 +42,7 @@ export default function SalesReport() {
   }, [startDate, endDate, selectedCategory]);
 
   const fetchReport = async () => {
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const query = new URLSearchParams({
         start_date: startDate,

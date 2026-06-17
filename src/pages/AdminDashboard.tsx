@@ -18,7 +18,7 @@ export default function AdminDashboard() {
   
   const [recentSales, setRecentSales] = useState<any[]>([]);
   const [dailyData, setDailyData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'recent') {
@@ -29,7 +29,7 @@ export default function AdminDashboard() {
   }, [activeTab, reportMonth]);
 
   const fetchRecentActivity = async () => {
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const res = await fetch('/api/admin/detailed-sales-report-rows?limit=100', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -46,7 +46,7 @@ export default function AdminDashboard() {
   };
 
   const fetchDailyReport = async () => {
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const res = await fetch(`/api/admin/daily-pdf-report?month=${reportMonth}`, {
         headers: { 'Authorization': `Bearer ${token}` }

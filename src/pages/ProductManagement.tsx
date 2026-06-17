@@ -63,7 +63,7 @@ export default function ProductManagement() {
 
   const fetchAdditionalMetadata = async () => {
     try {
-      setLoading(true);
+      /* setLoading removed to prevent flicker */
       const [supRes, catRes, cat2Res, brandRes, unitRes] = await Promise.all([
         fetch('/api/suppliers', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/categories', { headers: { 'Authorization': `Bearer ${token}` } }),

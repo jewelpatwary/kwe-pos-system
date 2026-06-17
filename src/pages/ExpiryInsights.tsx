@@ -29,14 +29,14 @@ interface ExpiringItem {
 
 const ExpiryInsights: React.FC = () => {
   const [items, setItems] = useState<ExpiringItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [daysThreshold, setDaysThreshold] = useState(90);
   const [searchTerm, setSearchTerm] = useState('');
   const { currency } = useTheme();
   const { token } = useAuthStore();
 
   const fetchExpiryData = async () => {
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const res = await fetch(`/api/admin/expiry-insights?days=${daysThreshold}`, {
         headers: { 'Authorization': `Bearer ${token}` }

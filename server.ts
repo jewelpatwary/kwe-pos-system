@@ -6,7 +6,7 @@ import bwipjs from 'bwip-js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db, initDB, seedProducts } from './src/server/db.js';
-import { getSupabase } from './src/lib/supabaseClient.js';
+import { getSupabase, shopContext, shopsRegistry } from './src/lib/supabaseClient.js';
 
 import os from 'os';
 
@@ -48,6 +48,7 @@ const INVOICE_CATEGORIES_FILE = path.join(DATA_DIR, 'invoice_categories.json');
 const PI_EXT_FILE = path.join(DATA_DIR, 'purchase_invoice_ext.json');
 const EXPENSE_CATEGORIES_FILE = path.join(DATA_DIR, 'expense_categories.json');
 const SEED_LOCK_FILE = path.join(DATA_DIR, 'seed.lock');
+const SHOPS_FILE = path.join(DATA_DIR, 'shops.json');
 
 // --- ONLINE SETTINGS STORE (SUPABASE SYNC) ---
 const SETTINGS_KEYS = {
@@ -64,7 +65,37 @@ const SETTINGS_KEYS = {
   PROD_MODIFIED: 'data_product_last_modified'
 };
 
-const settingsCache: { [key: string]: any } = {};
+
+// --- MULTI-TENANT SHOPS SETUP ---
+function loadShops() {
+  try {
+    if (fs.existsSync(SHOPS_FILE)) {
+      const shopsData = JSON.parse(fs.readFileSync(SHOPS_FILE, 'utf8'));
+      if (Array.isArray(shopsData)) {
+        shopsData.forEach(shop => {
+           if (shop.id && shop.supabaseUrl && shop.supabaseKey) {
+             shopsRegistry[shop.id] = { supabaseUrl: shop.supabaseUrl, supabaseKey: shop.supabaseKey };
+           }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load shops.json', err);
+  }
+}
+function saveShops(shops: any[]) {
+  fs.writeFileSync(SHOPS_FILE, JSON.stringify(shops, null, 2), 'utf8');
+}
+loadShops();
+
+const settingsCache: { [shopId: string]: { [key: string]: any } } = {};
+
+function getLocalSettingsCache(shopId: string) {
+  if (!settingsCache[shopId]) {
+    settingsCache[shopId] = {};
+  }
+  return settingsCache[shopId];
+}
 
 // Proxy supabase to implement lazy initialization
 const supabase = {
@@ -73,7 +104,8 @@ const supabase = {
 };
 
 async function syncSettingOnline(key: string, value: any) {
-  settingsCache[key] = value;
+  const shopId = shopContext.getStore() || 'default';
+  getLocalSettingsCache(shopId)[key] = value;
   try {
     const strValue = typeof value === 'string' ? value : JSON.stringify(value);
     await supabase.from('settings').upsert({ key, value: strValue }, { onConflict: 'key' });
@@ -82,10 +114,14 @@ async function syncSettingOnline(key: string, value: any) {
   }
 }
 
-async function initializeSettingsFromOnline() {
-  console.log('[INITIALIZE] Fetching settings from Supabase...');
+async function initializeSettingsFromOnline(shopIdParam?: string) {
+  const shopId = shopIdParam || 'default';
+  console.log(`[INITIALIZE] Fetching settings from Supabase for shop: ${shopId}...`);
   try {
-    const { data, error } = await supabase.from('settings').select('key, value');
+    const client = getSupabase(shopId);
+    if (!client) return;
+    
+    const { data, error } = await client.from('settings').select('key, value');
     if (error) throw error;
     if (data) {
       data.forEach((item: any) => {
@@ -93,28 +129,29 @@ async function initializeSettingsFromOnline() {
           const trimmed = (item.value || '').trim();
           // Only auto-parse if it looks like JSON
           if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-             settingsCache[item.key] = JSON.parse(trimmed);
+             getLocalSettingsCache(shopId)[item.key] = JSON.parse(trimmed);
           } else {
-             settingsCache[item.key] = item.value;
+             getLocalSettingsCache(shopId)[item.key] = item.value;
           }
         } catch (e) {
-          settingsCache[item.key] = item.value;
+          getLocalSettingsCache(shopId)[item.key] = item.value;
         }
       });
-      console.log(`[INITIALIZE] Loaded ${data.length} settings from database.`);
+      console.log(`[INITIALIZE] Loaded ${data.length} settings from database for ${shopId}.`);
     }
   } catch (err) {
-    console.error('[INITIALIZE] Fatal error loading settings:', err);
+    console.error(`[INITIALIZE] Fatal error loading settings for ${shopId}:`, err);
   }
 }
 
 async function getSettingOnline(key: string, defaultValueRef: any) {
+  const shopId = shopContext.getStore() || 'default';
   try {
     const { data, error } = await supabase.from('settings').select('value').eq('key', key).single();
     if (!error && data && data.value) {
       try {
         const parsed = JSON.parse(data.value.trim());
-        settingsCache[key] = parsed;
+        getLocalSettingsCache(shopId)[key] = parsed;
         return parsed;
       } catch (e) {
         // failed parsing, use cache
@@ -123,7 +160,7 @@ async function getSettingOnline(key: string, defaultValueRef: any) {
   } catch (err) {
     console.error(`[DATABASE] Failed to read key ${key} from database:`, err);
   }
-  return settingsCache[key] !== undefined ? settingsCache[key] : defaultValueRef;
+  return getLocalSettingsCache(shopId)[key] !== undefined ? getLocalSettingsCache(shopId)[key] : defaultValueRef;
 }
 
 async function readCategories2() {
@@ -232,10 +269,9 @@ const authenticateToken = (req: any, res: any, next: any) => {
 
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
     if (err) {
-        console.log('Invalid token:', err);
-        return res.status(403).json({ success: false, message: 'Forbidden: Invalid token' });
+        console.log('JWT auth failed:', err.message);
+        return res.status(401).json({ success: false, message: 'Unauthorized: ' + (err.message || 'JWT error') });
     }
-    console.log('Token verified for user:', user);
     req.user = user;
     next();
   });
@@ -253,6 +289,17 @@ const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// Shop Context Middleware
+app.use((req, res, next) => {
+  const shopId = req.headers['x-shop-id'] as string;
+  if (shopId) {
+    shopContext.run(shopId, () => next());
+  } else {
+    next();
+  }
+});
+
 
 // Initialize Database in the background synchronously to avoid blocking module import in serverless environments
 initDB();
@@ -442,13 +489,135 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   });
 
 // AUTHENTICATION
+
+  // -- SHOPS MANAGEMENT ENDPOINTS --
+  app.get('/api/shops', (req, res) => {
+    let shopsList: any[] = [];
+    try {
+      if (fs.existsSync(SHOPS_FILE)) {
+        shopsList = JSON.parse(fs.readFileSync(SHOPS_FILE, 'utf8'));
+      }
+    } catch(e) {}
+    
+    // Add default shop if configured via env
+    if (process.env.SUPABASE_URL) {
+       shopsList.unshift({
+         id: 'default',
+         name: 'Main Server (Default)',
+         isDefault: true
+       });
+    }
+
+    res.json({
+      success: true,
+      data: shopsList.map(s => ({ id: s.id, name: s.name, isDefault: s.isDefault }))
+    });
+  });
+
+  app.post('/api/shops', (req, res) => {
+    // Basic protection; ideally should be behind master token but we allow local creation if unconfigured or master secret match
+    // Actually we will just create it locally
+    const { name, supabaseUrl, supabaseKey, useDefaultConfig } = req.body;
+    let url = supabaseUrl;
+    let key = supabaseKey;
+    
+    if (useDefaultConfig) {
+      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+         return res.status(400).json({success: false, message: 'Main server is not configured.'});
+      }
+      url = process.env.SUPABASE_URL;
+      key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    }
+    
+    if (!name || !url || !key) return res.status(400).json({success: false, message: 'Missing fields'});
+
+    let shopsList: any[] = [];
+    try {
+      if (fs.existsSync(SHOPS_FILE)) shopsList = JSON.parse(fs.readFileSync(SHOPS_FILE, 'utf8'));
+    } catch(e) {}
+
+    const newShop = {
+      id: 'shop_' + Date.now(),
+      name,
+      supabaseUrl: url,
+      supabaseKey: key
+    };
+    shopsList.push(newShop);
+    saveShops(shopsList);
+    loadShops(); // Refresh memory registry
+
+    res.json({ success: true, shopId: newShop.id });
+  });
+
+  app.put('/api/shops/:id', (req, res) => {
+    const { id } = req.params;
+    if (id === 'default') return res.status(400).json({success: false, message: 'Cannot edit default server.'});
+
+    const { name, supabaseUrl, supabaseKey, useDefaultConfig } = req.body;
+    let url = supabaseUrl;
+    let key = supabaseKey;
+    
+    if (useDefaultConfig) {
+      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+         return res.status(400).json({success: false, message: 'Main server is not configured.'});
+      }
+      url = process.env.SUPABASE_URL;
+      key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    }
+
+    if (!name || !url || !key) return res.status(400).json({success: false, message: 'Missing fields'});
+
+    let shopsList: any[] = [];
+    try {
+      if (fs.existsSync(SHOPS_FILE)) shopsList = JSON.parse(fs.readFileSync(SHOPS_FILE, 'utf8'));
+    } catch(e) {}
+
+    const index = shopsList.findIndex(s => s.id === id);
+    if (index === -1) return res.status(404).json({success: false, message: 'Shop not found'});
+
+    shopsList[index] = { ...shopsList[index], name, supabaseUrl: url, supabaseKey: key };
+    saveShops(shopsList);
+    loadShops();
+    res.json({success: true});
+  });
+
+  app.delete('/api/shops/:id', (req, res) => {
+    const { id } = req.params;
+    if (id === 'default') return res.status(400).json({success: false, message: 'Cannot delete default server.'});
+    
+    let shopsList: any[] = [];
+    try {
+      if (fs.existsSync(SHOPS_FILE)) shopsList = JSON.parse(fs.readFileSync(SHOPS_FILE, 'utf8'));
+    } catch(e) {}
+    
+    shopsList = shopsList.filter(s => s.id !== id);
+    saveShops(shopsList);
+    loadShops();
+    res.json({success: true});
+  });
+
+  app.get('/api/schema-file', (req, res) => {
+    try {
+      const schemaPath = path.join(process.cwd(), 'supabase-schema.sql');
+      const sqlContent = fs.readFileSync(schemaPath, 'utf8');
+      res.json({ success: true, content: sqlContent });
+    } catch (e: any) {
+      res.json({ success: false, message: 'Could not load schema file: ' + e.message });
+    }
+  });
+
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     console.log(`[LOGIN] Attempt for username: ${username}`);
     
     // Check if Supabase keys are configured
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const shopId = shopContext.getStore();
+    let supabaseUrl: string | undefined = process.env.SUPABASE_URL;
+    let supabaseKey: string | undefined = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (shopId && shopId !== 'default' && shopsRegistry[shopId]) {
+       supabaseUrl = shopsRegistry[shopId].supabaseUrl;
+       supabaseKey = shopsRegistry[shopId].supabaseKey;
+    }
     const isConfigured = !!(supabaseUrl && supabaseKey);
 
     try {
@@ -483,11 +652,16 @@ app.post('/api/auth/login', async (req, res) => {
           const errorMessage = typeof error?.message === 'string' && error.message.includes('<!DOCTYPE html>') 
             ? 'Received HTML response (Likely invalid SUPABASE_URL)' 
             : error?.message || 'Not found';
-          console.log(`[LOGIN] User lookup failed or error: ${errorMessage}`);
+          console.log(`[LOGIN] User lookup returned: ${errorMessage}`);
           
-          // Let admin/admin123 succeed as fallback if it is a DB connection/configuration error
+          const isSchemaMissing = typeof error?.message === 'string' && (error.message.includes('schema cache') || error.message.includes('table') || error.message.includes('public.users'));
+          if (isSchemaMissing) {
+            return res.status(500).json({ success: false, message: 'DATABASE_NOT_INITIALIZED' });
+          }
+          
+          // Let admin/admin123 succeed as fallback if it is a DB connection/configuration mismatch
           if (username === 'admin' && password === 'admin123') {
-            console.warn('[LOGIN] Database query failed or user not present. Authenticating via admin fallback.');
+            console.log('[LOGIN] User not present. Authenticating via admin fallback.');
             const token = jwt.sign(
               { id: 999999, username: 'admin', role: 'ADMIN' },
               JWT_SECRET,
@@ -538,11 +712,11 @@ app.post('/api/auth/login', async (req, res) => {
         });
 
       } catch (dbError: any) {
-        console.error('[LOGIN] Supabase client operation exception:', dbError);
+        console.log('[LOGIN] Supabase client operation returned message:', dbError.message);
         
         // Handle admin fallback if DB threw connection exceptions
         if (username === 'admin' && password === 'admin123') {
-          console.warn('[LOGIN] Exception caught. Allowing admin fallback credentials access.');
+          console.log('[LOGIN] Fallback triggered. Allowing admin fallback credentials access.');
           const token = jwt.sign(
             { id: 999999, username: 'admin', role: 'ADMIN' },
             JWT_SECRET,
@@ -566,21 +740,42 @@ app.post('/api/auth/login', async (req, res) => {
 
   // CONFIGURATION STATUS CHECK
   app.get('/api/config-status', async (req, res) => {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const shopId = shopContext.getStore();
+    
+    let supabaseUrl: string | undefined = process.env.SUPABASE_URL;
+    let supabaseKey: string | undefined = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (shopId && shopId !== 'default' && shopsRegistry[shopId]) {
+       supabaseUrl = shopsRegistry[shopId].supabaseUrl;
+       supabaseKey = shopsRegistry[shopId].supabaseKey;
+    }
+
     const isConfigured = !!(supabaseUrl && supabaseKey);
     let isConnected = false;
     let errorDetail: string | null = null;
 
     if (isConfigured) {
       try {
-        const { error } = await supabase.from('users').select('*', { count: 'exact', head: true });
+        const client = shopId && shopId !== 'default' && shopsRegistry[shopId] 
+            ? getSupabase(shopId) 
+            : supabase; // Default proxy supabase
+
+        const { error, count } = await client.from('users').select('*', { count: 'exact', head: true });
         if (error) {
           errorDetail = typeof error.message === 'string' && error.message.includes('<!DOCTYPE html>')
             ? 'Received HTML response (Likely invalid SUPABASE_URL)'
             : error.message;
         } else {
           isConnected = true;
+          // Seed the database if it's empty
+          if (count === 0) {
+            console.log(`[CONFIG] Users table is empty for shop ${shopId}. Running seedProducts(true)...`);
+            if (shopId && shopId !== 'default') {
+               await shopContext.run(shopId, () => seedProducts(true));
+            } else {
+               await seedProducts(true);
+            }
+          }
         }
       } catch (err: any) {
         errorDetail = err?.message || String(err);
@@ -2039,8 +2234,16 @@ app.post('/api/auth/login', async (req, res) => {
       const CHUNK_SIZE = 500;
       for (let i = 0; i < validCustomers.length; i += CHUNK_SIZE) {
         const chunk = validCustomers.slice(i, i + CHUNK_SIZE);
-        const { error } = await supabase.from('customers').insert(chunk);
+        const { data: insertedData, error } = await supabase.from('customers').insert(chunk).select('id, daily_limit, auto_burn, auto_burn_start_date, auto_burn_stop_date');
         if (error) throw error;
+
+        if (insertedData) {
+          for (const c of insertedData) {
+            if (c.auto_burn && c.auto_burn_start_date && Number(c.daily_limit) > 0) {
+              await processBackdatedAutoBurn(Number(c.id), Number(c.daily_limit), c.auto_burn_start_date, c.auto_burn_stop_date);
+            }
+          }
+        }
       }
 
       res.json({ success: true, message: `${validCustomers.length} customers imported successfully.` });
@@ -2087,6 +2290,10 @@ app.post('/api/auth/login', async (req, res) => {
         const mappings = await readCustomerAutoCreditProduct();
         mappings[data[0].id.toString()] = auto_credit_product_id.toString();
         await writeCustomerAutoCreditProduct(mappings);
+      }
+
+      if (auto_burn && auto_burn_start_date && (Number(daily_limit) > 0)) {
+        await processBackdatedAutoBurn(Number(data[0].id), Number(daily_limit), auto_burn_start_date, auto_burn_stop_date);
       }
       
       res.json({ success: true, message: 'Customer added', id: data[0].id });
@@ -2139,6 +2346,10 @@ app.post('/api/auth/login', async (req, res) => {
         delete mappings[id.toString()];
       }
       await writeCustomerAutoCreditProduct(mappings);
+
+      if (auto_burn && auto_burn_start_date && (Number(daily_limit) > 0)) {
+        await processBackdatedAutoBurn(Number(id), Number(daily_limit), auto_burn_start_date, auto_burn_stop_date);
+      }
       
       res.json({ success: true, message: 'Customer updated' });
     } catch (error: any) {
@@ -2374,7 +2585,10 @@ app.post('/api/auth/login', async (req, res) => {
       (settings || []).forEach((s: any) => data[s.key] = s.value);
       res.json({ success: true, data });
     } catch (error: any) {
-      console.error('Supabase fetch theme settings error:', error);
+      if (typeof error.message === 'string' && (error.message.includes('relation') || error.message.includes('schema'))) {
+         return res.json({ success: true, data: {} }); // Silent fallback if schema isn't setup
+      }
+      console.error('Supabase fetch theme settings error:', error.message || error);
       res.status(500).json({ success: false, message: error.message });
     }
   });
@@ -2646,6 +2860,123 @@ app.post('/api/auth/login', async (req, res) => {
   });
 
 
+  // Helper to process backdated auto-burn
+  const processBackdatedAutoBurn = async (customerId: number, dailyLimit: number, startDateStr: string, stopDateStr?: string | null) => {
+    if (!startDateStr || dailyLimit <= 0) return;
+
+    try {
+      // Parse YYYY-MM-DD safely
+      const parseDateOnlyStr = (str: string) => {
+        const parts = str.split('T')[0].split('-');
+        return {
+          year: parseInt(parts[0], 10),
+          month: parseInt(parts[1], 10) - 1,
+          day: parseInt(parts[2], 10)
+        };
+      };
+
+      const startParts = parseDateOnlyStr(startDateStr);
+      let current = new Date(Date.UTC(startParts.year, startParts.month, startParts.day));
+
+      // Determine yesterday in UTC too
+      const todayUTC = new Date();
+      const [ty, tmo, td] = todayUTC.toISOString().split('T')[0].split('-').map(Number);
+      
+      const yesterdayUTC = new Date(Date.UTC(ty, tmo - 1, td - 1));
+      const yesterdayStr = yesterdayUTC.toISOString().split('T')[0];
+
+      const startStr = current.toISOString().split('T')[0];
+      if (startStr > yesterdayStr) return;
+
+      // Fetch existing daily_credit_logs for this customer
+      const { data: existingLogs, error: fetchErr } = await supabase
+        .from('daily_credit_logs')
+        .select('date')
+        .eq('customer_id', customerId);
+
+      if (fetchErr) {
+        console.error(`[BACKDATED] Error fetching existing logs for customer ${customerId}:`, fetchErr);
+        return;
+      }
+
+      const existingDatesSet = new Set((existingLogs || []).map((l: any) => l.date));
+
+      // Get auto credit product mapping
+      const autoCreditMappings = await readCustomerAutoCreditProduct();
+      const autoCreditProductId = autoCreditMappings[customerId.toString()];
+
+      const candidateDates: string[] = [];
+
+      while (true) {
+        const currentStr = current.toISOString().split('T')[0];
+        if (currentStr > yesterdayStr) break;
+        if (stopDateStr && currentStr > stopDateStr.split('T')[0]) break;
+
+        if (!existingDatesSet.has(currentStr)) {
+          candidateDates.push(currentStr);
+        }
+
+        current.setDate(current.getDate() + 1);
+      }
+
+      if (candidateDates.length === 0) return;
+
+      console.log(`[BACKDATED] Found ${candidateDates.length} days of missing auto-burn for customer ${customerId} starting from ${startStr}:`, candidateDates);
+
+      for (const dateStr of candidateDates) {
+        const targetTimestamp = `${dateStr}T12:00:00Z`;
+
+        // 1. Insert into auto_burn_sales
+        await supabase.from('auto_burn_sales').insert([{
+          customer_id: customerId,
+          amount: dailyLimit,
+          status: 'SYSTEM_GENERATED',
+          product_id: autoCreditProductId || null,
+          created_at: targetTimestamp
+        }]);
+
+        // 2. Insert sales
+        const { data: sale, error: saleErr } = await supabase.from('sales').insert([{
+          total_amount: dailyLimit,
+          discount_amount: 0,
+          payment_method: 'AUTO_BURN',
+          customer_id: customerId,
+          status: 'completed',
+          product_id: autoCreditProductId || null,
+          created_at: targetTimestamp
+        }]).select().single();
+
+        if (saleErr) {
+          console.error(`[BACKDATED] Failed to insert sale for customer ${customerId} on ${dateStr}:`, saleErr);
+          continue;
+        }
+
+        if (sale) {
+          // 3. Insert credit_logs
+          await supabase.from('credit_logs').insert([{
+            customer_id: customerId,
+            amount: dailyLimit,
+            type: 'DAILY_BURN',
+            reference_id: sale.id.toString(),
+            notes: 'Backdated daily credit expired - converted to AUTO_BURN sale',
+            created_at: targetTimestamp
+          }]);
+
+          // 4. Insert daily_credit_logs
+          await supabase.from('daily_credit_logs').insert([{
+            customer_id: customerId,
+            burned_amount: dailyLimit,
+            date: dateStr,
+            created_at: targetTimestamp
+          }]);
+        }
+      }
+
+    } catch (e) {
+      console.error(`[BACKDATED] Unexpected error processing backdated auto burn for customer ${customerId}:`, e);
+    }
+  };
+
   // Credit Reset Background Jobs
   const checkCreditResets = async () => {
     const now = new Date();
@@ -2747,6 +3078,20 @@ app.post('/api/auth/login', async (req, res) => {
          
          await supabase.from('customers').update({ monthly_used: 0 }).eq('credit_status', 'ACTIVE');
          await supabase.from('settings').upsert([{ key: 'last_monthly_reset', value: month }], { onConflict: 'key' });
+      }
+
+      // 3. Backdated Auto-Burn Catch Up
+      const { data: activeCustomers, error: fetchCusErr } = await supabase
+        .from('customers')
+        .select('id, daily_limit, auto_burn, auto_burn_start_date, auto_burn_stop_date')
+        .eq('credit_status', 'ACTIVE');
+
+      if (!fetchCusErr && activeCustomers) {
+        for (const c of activeCustomers) {
+          if (c.auto_burn && c.auto_burn_start_date && Number(c.daily_limit) > 0) {
+            await processBackdatedAutoBurn(Number(c.id), Number(c.daily_limit), c.auto_burn_start_date, c.auto_burn_stop_date);
+          }
+        }
       }
     } catch (error) {
       console.error('Credit reset error:', error);
@@ -2949,7 +3294,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   // Create sale
   app.post('/api/sales', async (req, res) => {
-    const { items, payment_method, discount_amount, customer_id } = req.body;
+    const { items, payment_method, discount_amount, customer_id, created_at } = req.body;
     try {
       let total_amount = 0;
       for (const item of items) {
@@ -3025,13 +3370,20 @@ app.post('/api/auth/login', async (req, res) => {
 
         await supabase
           .from('credit_logs')
-          .insert([{ customer_id, amount: total_amount, type: 'CHARGE', notes: 'POS Credit Sale' }]);
+          .insert([{ customer_id, amount: total_amount, type: 'CHARGE', notes: 'POS Credit Sale', created_at: created_at || undefined }]);
       }
 
       // 3. Create Sale Record
       const { data: sale, error: saleError } = await supabase
         .from('sales')
-        .insert([{ total_amount, discount_amount: discount_amount || 0, payment_method, customer_id: customer_id || null, status: 'completed' }])
+        .insert([{ 
+          total_amount, 
+          discount_amount: discount_amount || 0, 
+          payment_method, 
+          customer_id: customer_id || null, 
+          status: 'completed',
+          created_at: created_at || undefined
+        }])
         .select()
         .single();
       
@@ -3057,7 +3409,14 @@ app.post('/api/auth/login', async (req, res) => {
         // Log movement
         await supabase
           .from('stock_movements')
-          .insert([{ product_id: productId, quantity: qty, type: 'OUT', reference_type: 'SALE', reference_id: saleId }]);
+          .insert([{ 
+            product_id: productId, 
+            quantity: qty, 
+            type: 'OUT', 
+            reference_type: 'SALE', 
+            reference_id: saleId,
+            created_at: created_at || undefined
+          }]);
 
         // FIFO Batch Deduction
         let remainingQtyToDeduct = qty;
@@ -3526,6 +3885,81 @@ app.post('/api/auth/login', async (req, res) => {
       const categoryBreakdown = Object.entries(categoryMap).map(([category_name, data]: [any, any]) => ({ category_name, ...data }));
       const itemDetails = Object.values(itemMap).sort((a: any, b: any) => b.total_value - a.total_value).slice(0, 50);
 
+      // Build daily category pivot summary
+      const dailyPivotMap: any = {};
+      const allCategoriesSet = new Set<string>();
+
+      (sales || []).forEach((item: any) => {
+        if (!item.sales || !item.sales.created_at) return;
+        const dateStr = item.sales.created_at.split('T')[0];
+        const catName = item.products?.categories?.name || 'Uncategorized';
+        allCategoriesSet.add(catName);
+
+        if (!dailyPivotMap[dateStr]) {
+          dailyPivotMap[dateStr] = {
+            categories: {},
+            cash: 0,
+            tng: 0
+          };
+        }
+        if (!dailyPivotMap[dateStr].categories) {
+          dailyPivotMap[dateStr].categories = {};
+        }
+        dailyPivotMap[dateStr].categories[catName] = (dailyPivotMap[dateStr].categories[catName] || 0) + item.subtotal;
+
+        const method = item.sales.payment_method;
+        if (method === 'CASH') {
+          dailyPivotMap[dateStr].cash = (dailyPivotMap[dateStr].cash || 0) + item.subtotal;
+        } else if (method === 'TNG' || method === 'ONLINE') {
+          dailyPivotMap[dateStr].tng = (dailyPivotMap[dateStr].tng || 0) + item.subtotal;
+        }
+      });
+
+      (returns || []).forEach((item: any) => {
+        if (!item.sales_returns || !item.sales_returns.created_at) return;
+        const dateStr = item.sales_returns.created_at.split('T')[0];
+        const catName = item.products?.categories?.name || 'Uncategorized';
+        allCategoriesSet.add(catName);
+
+        if (!dailyPivotMap[dateStr]) {
+          dailyPivotMap[dateStr] = {
+            categories: {},
+            cash: 0,
+            tng: 0
+          };
+        }
+        if (!dailyPivotMap[dateStr].categories) {
+          dailyPivotMap[dateStr].categories = {};
+        }
+        const val = -(item.quantity * item.refund_amount);
+        dailyPivotMap[dateStr].categories[catName] = (dailyPivotMap[dateStr].categories[catName] || 0) + val;
+
+        const method = item.sales_returns.refund_type;
+        if (method === 'CASH') {
+          dailyPivotMap[dateStr].cash = (dailyPivotMap[dateStr].cash || 0) + val;
+        } else if (method === 'TNG' || method === 'ONLINE') {
+          dailyPivotMap[dateStr].tng = (dailyPivotMap[dateStr].tng || 0) + val;
+        }
+      });
+
+      const uniqueCategories = Array.from(allCategoriesSet).sort();
+      const dailyPivotRows = Object.entries(dailyPivotMap).map(([date, dataObj]: [string, any]) => {
+        const values: any = {};
+        let rowTotal = 0;
+        uniqueCategories.forEach(cat => {
+          const val = dataObj.categories?.[cat] || 0;
+          values[cat] = val;
+          rowTotal += val;
+        });
+        return {
+          date,
+          values,
+          cash: dataObj.cash || 0,
+          tng: dataObj.tng || 0,
+          total: rowTotal
+        };
+      }).sort((a, b) => b.date.localeCompare(a.date));
+
       const summary = {
         totalReal: stats.filter(s => ['CASH', 'CREDIT', 'ONLINE', 'TNG'].includes(s.payment_method)).reduce((acc, s) => acc + s.total, 0),
         totalCredit: stats.find(s => s.payment_method === 'CREDIT')?.total || 0,
@@ -3535,7 +3969,7 @@ app.post('/api/auth/login', async (req, res) => {
         grandTotal: stats.reduce((acc, s) => acc + s.total, 0)
       };
 
-      res.json({ success: true, data: stats, summary, categoryBreakdown, itemDetails });
+      res.json({ success: true, data: stats, summary, categoryBreakdown, itemDetails, dailyPivot: { categories: uniqueCategories, rows: dailyPivotRows } });
     } catch (error: any) {
       console.error('Supabase detailed sales report error:', error);
       res.status(500).json({ success: false, message: error.message });
@@ -4125,6 +4559,7 @@ app.post('/api/auth/login', async (req, res) => {
           ...pi,
           supplier_name: pi.suppliers?.name,
           payment_type: pType ? pType.name : (ext.payment_type || 'N/A'),
+          payment_type_id: ext.payment_type_id || null,
           category_name: cat ? cat.name : 'N/A'
         };
       });
@@ -4140,12 +4575,18 @@ app.post('/api/auth/login', async (req, res) => {
     const { invoice_number, supplier_id, date, items, total_amount, paid_amount, payment_type_id, invoice_category_id } = req.body;
     
     try {
-      const due_amount = total_amount - (paid_amount || 0);
+      let final_paid_amount = paid_amount || 0;
+      if (payment_type_id?.toString() === '1') {
+        final_paid_amount = total_amount || 0;
+      } else if (payment_type_id?.toString() === '3') {
+        final_paid_amount = 0;
+      }
+      const due_amount = total_amount - final_paid_amount;
       const payment_status = due_amount <= 0 ? 'PAID' : 'CREDIT';
 
       const { data: invoice, error: invError } = await supabase
         .from('purchase_invoices')
-        .insert([{ invoice_number, supplier_id, total_amount, paid_amount: paid_amount || 0, due_amount, payment_status, date }])
+        .insert([{ invoice_number, supplier_id, total_amount, paid_amount: final_paid_amount, due_amount, payment_status, date }])
         .select()
         .single();
 
@@ -4162,8 +4603,14 @@ app.post('/api/auth/login', async (req, res) => {
       await writePIExt(piExt);
 
       // Record initial payment if any
-      if (paid_amount > 0) {
-        await supabase.from('purchase_invoice_payments').insert([{ invoice_id: invoiceId, amount: paid_amount, date }]);
+      const actualPaymentRecorded = payment_type_id?.toString() === '1' ? total_amount : (paid_amount || 0);
+      if (actualPaymentRecorded > 0) {
+        await supabase.from('purchase_invoice_payments').insert([{
+          invoice_id: invoiceId,
+          amount: actualPaymentRecorded,
+          payment_method: 'CASH',
+          date: date || new Date().toISOString().split('T')[0]
+        }]);
       }
 
       for (const item of items) {
@@ -4389,13 +4836,42 @@ app.post('/api/auth/login', async (req, res) => {
       await supabase.from('stock_batches').delete().eq('purchase_invoice_id', req.params.id);
 
       // 3. Update Invoice Header
-      const due_amount = total_amount - (paid_amount || 0);
+      let final_paid_amount = 0;
+      if (payment_type_id?.toString() === '1') {
+        final_paid_amount = total_amount || 0;
+        // Delete older payments and insert a single payment of total_amount
+        await supabase.from('purchase_invoice_payments').delete().eq('invoice_id', req.params.id);
+        await supabase.from('purchase_invoice_payments').insert([{
+          invoice_id: req.params.id,
+          amount: total_amount,
+          payment_method: 'CASH',
+          date: date || new Date().toISOString().split('T')[0]
+        }]);
+      } else if (payment_type_id?.toString() === '3') {
+        // If it was Cash paid earlier, or if it has existing payments, sum them
+        const { data: payments } = await supabase
+          .from('purchase_invoice_payments')
+          .select('amount')
+          .eq('invoice_id', req.params.id);
+        const sumOfPayments = (payments || []).reduce((acc: number, p: any) => acc + (p.amount || 0), 0);
+        
+        const piExt = await readPIExt();
+        const oldExt = piExt[req.params.id.toString()] || {};
+        if (oldExt.payment_type_id?.toString() === '1') {
+          // Changed from Cash Paid to Credit! Delete the auto physical payment.
+          await supabase.from('purchase_invoice_payments').delete().eq('invoice_id', req.params.id);
+          final_paid_amount = 0;
+        } else {
+          final_paid_amount = sumOfPayments;
+        }
+      }
+      const due_amount = Math.max(0, total_amount - final_paid_amount);
       const payment_status = due_amount <= 0 ? 'PAID' : 'CREDIT';
 
       await supabase.from('purchase_invoices').update({
         supplier_id,
         total_amount,
-        paid_amount: paid_amount || 0,
+        paid_amount: final_paid_amount,
         due_amount,
         payment_status,
         date
@@ -4688,27 +5164,36 @@ app.post('/api/auth/login', async (req, res) => {
   app.get('/api/admin/daily-pdf-report', authenticateToken, requireAdmin, async (req, res) => {
     try {
       const { month } = req.query; // format YYYY-MM
+      if (!month || typeof month !== 'string' || !month.includes('-')) {
+        return res.status(400).json({ success: false, message: 'Invalid month format. Expected YYYY-MM.' });
+      }
+
+      const parts = month.split('-');
+      const year = parseInt(parts[0], 10);
+      const monthNum = parseInt(parts[1], 10);
+      const lastDay = new Date(year, monthNum, 0).getDate();
       const monthStart = `${month}-01T00:00:00`;
-      const monthEnd = `${month}-31T23:59:59`; // Simple approximation
+      const monthEnd = `${month}-${String(lastDay).padStart(2, '0')}T23:59:59`;
 
       // 1. Sales by category and date
-      const { data: salesRaw } = await supabase
+      const { data: salesRaw, error: sErr } = await supabase
         .from('sale_items')
         .select(`
           subtotal,
           sales!inner(created_at, status),
-          products!inner(category_id),
-          categories:products(categories!inner(name))
+          products!inner(category_id, categories(name))
         `)
         .eq('sales.status', 'completed')
         .gte('sales.created_at', monthStart)
         .lte('sales.created_at', monthEnd);
 
+      if (sErr) throw sErr;
+
       const salesByCategory: any[] = [];
       const salesMap = new Map();
       (salesRaw || []).forEach((si: any) => {
         const date = si.sales.created_at.split('T')[0];
-        const category = (si.categories?.name || 'OTHER').toUpperCase();
+        const category = (si.products?.categories?.name || 'OTHER').toUpperCase();
         const key = `${date}_${category}`;
         const current = salesMap.get(key) || 0;
         salesMap.set(key, current + si.subtotal);
@@ -4719,23 +5204,24 @@ app.post('/api/auth/login', async (req, res) => {
       });
 
       // 2. Returns by category
-      const { data: returnsRaw } = await supabase
+      const { data: returnsRaw, error: rErr } = await supabase
         .from('sales_return_items')
         .select(`
           quantity,
           refund_amount,
           sales_returns!inner(created_at),
-          products!inner(category_id),
-          categories:products(categories!inner(name))
+          products!inner(category_id, categories(name))
         `)
         .gte('sales_returns.created_at', monthStart)
         .lte('sales_returns.created_at', monthEnd);
+
+      if (rErr) throw rErr;
 
       const returnsByCategory: any[] = [];
       const returnsMap = new Map();
       (returnsRaw || []).forEach((sri: any) => {
         const date = sri.sales_returns.created_at.split('T')[0];
-        const category = (sri.categories?.name || 'OTHER').toUpperCase();
+        const category = (sri.products?.categories?.name || 'OTHER').toUpperCase();
         const key = `${date}_${category}`;
         const current = returnsMap.get(key) || 0;
         returnsMap.set(key, current + (sri.quantity * sri.refund_amount));
@@ -4746,12 +5232,14 @@ app.post('/api/auth/login', async (req, res) => {
       });
 
       // 3. Total Cash/Credit Sales by Date
-      const { data: salesPaymentRaw } = await supabase
+      const { data: salesPaymentRaw, error: spErr } = await supabase
         .from('sales')
         .select('created_at, total_amount, payment_method, customer_id, status')
         .eq('status', 'completed')
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd);
+
+      if (spErr) throw spErr;
 
       const salesByPaymentMethod: any[] = [];
       const paymentMap = new Map();
@@ -4768,7 +5256,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
 
       // 4. Returns by payment method
-      const { data: returnsPaymentRaw } = await supabase
+      const { data: returnsPaymentRaw, error: rpErr } = await supabase
         .from('sales_returns')
         .select(`
           created_at,
@@ -4778,6 +5266,8 @@ app.post('/api/auth/login', async (req, res) => {
         `)
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd);
+
+      if (rpErr) throw rpErr;
 
       const returnsByPaymentMethod: any[] = [];
       const retPaymentMap = new Map();
@@ -4794,16 +5284,17 @@ app.post('/api/auth/login', async (req, res) => {
       });
 
       // 5. Purchases
-      const { data: purchasesRaw } = await supabase
+      const { data: purchasesRaw, error: purErr } = await supabase
         .from('purchase_invoice_items')
         .select(`
           total_price,
           purchase_invoices!inner(id, date, payment_status, status),
-          products!inner(id, category_id),
-          categories_main:products(categories!inner(name))
+          products!inner(id, category_id, categories(name))
         `)
         .eq('purchase_invoices.status', 'ACTIVE')
         .ilike('purchase_invoices.date', `${month}%`);
+
+      if (purErr) throw purErr;
 
       const purchases: any[] = [];
       const purchaseMap = new Map();
@@ -4811,7 +5302,7 @@ app.post('/api/auth/login', async (req, res) => {
         const date = pii.purchase_invoices.date;
         
         // Group ONLY by Primary Main Category as requested
-        const categoryName = pii.categories_main?.name || 'OTHER';
+        const categoryName = pii.products?.categories?.name || 'OTHER';
 
         const category = categoryName.toUpperCase();
         const status = pii.purchase_invoices.payment_status;
@@ -4825,14 +5316,18 @@ app.post('/api/auth/login', async (req, res) => {
       });
 
       // 6. All Categories (Use only main categories from DB)
-      const { data: categoriesData } = await supabase.from('categories').select('name').eq('status', 'active');
+      const { data: categoriesData, error: catErr } = await supabase.from('categories').select('name').eq('status', 'active');
+      if (catErr) throw catErr;
+
       const categories = (categoriesData || []).map(c => ({ name: (c.name || '').toUpperCase() }));
 
       // 7. Expenses
-      const { data: expensesRaw } = await supabase
+      const { data: expensesRaw, error: expErr } = await supabase
         .from('expenses')
         .select('category, description, amount')
         .ilike('date', `${month}%`);
+
+      if (expErr) throw expErr;
 
       const expenses: any[] = [];
       const expenseMap = new Map();
@@ -5117,8 +5612,6 @@ app.post('/api/auth/login', async (req, res) => {
 
   // --- VITE MIDDLEWARE (Must be after API routes) ---
   async function runServer() {
-    // LOAD ONLINE SETTINGS BEFORE STARTING SERVER
-    await initializeSettingsFromOnline();
     
     const PORT = 3000;
     if (process.env.VERCEL !== '1') {
@@ -5140,6 +5633,8 @@ app.post('/api/auth/login', async (req, res) => {
       if (!process.env.VERCEL) {
         app.listen(PORT, '0.0.0.0', () => {
           console.log(`Server running on http://localhost:${PORT}`);
+          // LOAD ONLINE SETTINGS AFTER STARTING SERVER TO PREVENT STARTUP HANG
+          initializeSettingsFromOnline().catch(console.error);
         });
       }
     }

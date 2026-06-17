@@ -20,9 +20,58 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
+  const [sqlSchema, setSqlSchema] = useState<string | null>(null);
+
+  const fetchSchema = () => {
+    fetch('/api/schema-file')
+      .then(r => r.json())
+      .then(data => {
+         if(data.success) setSqlSchema(data.content);
+      }).catch(() => {});
+  };
   
   const navigate = useNavigate();
   const { login } = useAuthStore();
+  
+    const [shops, setShops] = useState<{id: string, name: string}[]>([]);
+    
+    const shopName = localStorage.getItem('activeShopName') || localStorage.getItem('activeShop') || 'Default Server';
+    const activeShopId = localStorage.getItem('activeShop') || 'default';
+
+    useEffect(() => {
+      fetch('/api/shops')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                setShops(data.data);
+            }
+        }).catch(() => {});
+    }, []);
+
+    const handleSwitchShop = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const selectedId = e.target.value;
+      if (selectedId === 'ADD_NEW') {
+        localStorage.removeItem('activeShop');
+        localStorage.removeItem('activeShopName');
+        localStorage.setItem('forceAddNew', 'true');
+        useAuthStore.getState().logout();
+        window.location.reload();
+        return;
+      }
+      if (selectedId === 'EDIT_CURRENT') {
+        localStorage.setItem('editShopId', activeShopId);
+        localStorage.removeItem('activeShop');
+        localStorage.removeItem('activeShopName');
+        useAuthStore.getState().logout();
+        window.location.reload();
+        return;
+      }
+      const selectedShop = shops.find(s => s.id === selectedId);
+      localStorage.setItem('activeShop', selectedId);
+      if (selectedShop) localStorage.setItem('activeShopName', selectedShop.name);
+      useAuthStore.getState().logout();
+      window.location.reload();
+    };
 
   useEffect(() => {
     fetch('/api/config-status')
@@ -32,11 +81,18 @@ export default function Login() {
           return res.json();
         }
         const text = await res.text();
+        if (text.includes('<title>Starting Server...</title>')) {
+          console.warn('Server is still starting up');
+          return { success: false, isConfigured: false, error: 'Server starting' };
+        }
         throw new Error(`Non-JSON config response (${res.status}): ${text.substring(0, 100)}`);
       })
       .then(data => {
-        if (data.success) {
+        if (data && data.success) {
           setConfigStatus(data);
+          if (data.errorDetail && (data.errorDetail.toLowerCase().includes('schema') || data.errorDetail.includes('public.users'))) {
+             fetchSchema();
+          }
         }
       })
       .catch(err => console.error('Failed to retrieve server configuration status:', err));
@@ -67,6 +123,9 @@ export default function Login() {
         data = await res.json();
       } else {
         const rawText = await res.text();
+        if (rawText.includes('<title>Starting Server...</title>')) {
+          throw new Error(`The server is still starting up. Please wait 10 seconds and try again.`);
+        }
         throw new Error(`Server returned non-JSON response (Status ${res.status}): ${rawText.substring(0, 250)}`);
       }
       
@@ -78,7 +137,12 @@ export default function Login() {
           navigate('/pos');
         }
       } else {
-        setError(data.message || 'Login failed');
+        if (data.message === 'DATABASE_NOT_INITIALIZED') {
+           setError('Database missing schema. Please copy the SQL Schema below and run it in Supabase.');
+           fetchSchema();
+        } else {
+           setError(data.message || 'Login failed');
+        }
       }
     } catch (err: any) {
       console.error('Login request failed details:', err);
@@ -111,6 +175,25 @@ export default function Login() {
       </div>
 
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md space-y-4">
+        {/* Active Shop Context Banner */}
+        <div className="p-3 bg-white border border-slate-200 rounded-lg shadow-sm flex items-center justify-between gap-4">
+          <div className="flex flex-col flex-1">
+            <span className="text-[8px] text-slate-400 font-bold tracking-widest uppercase mb-1">Target Server</span>
+            <select 
+              value={activeShopId}
+              onChange={handleSwitchShop}
+              className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-bold cursor-pointer"
+            >
+              {shops.map(shop => (
+                <option key={shop.id} value={shop.id}>{shop.name.toUpperCase()}</option>
+              ))}
+              <option disabled>──────────</option>
+              <option value="ADD_NEW">+ ADD NEW SHOP SERVER</option>
+              {activeShopId !== 'default' && <option value="EDIT_CURRENT">✎ EDIT / DELETE CURRENT SERVER...</option>}
+            </select>
+          </div>
+        </div>
+
         {/* Supabase Status Banner */}
         {configStatus && !configStatus.isConnected && (
           <div className="p-4 border rounded-lg flex flex-col gap-2 transition-all bg-amber-50 border-amber-200 text-amber-800">
@@ -218,8 +301,8 @@ export default function Login() {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full flex justify-center items-center gap-2 py-4 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black tracking-[0.3em] rounded transition-all shadow-xl shadow-indigo-500/10 disabled:opacity-50"
+                disabled={loading || (configStatus !== null && !configStatus.isConnected)}
+                className="w-full flex justify-center items-center gap-2 py-4 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black tracking-[0.3em] rounded transition-all shadow-xl shadow-indigo-500/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {loading ? 'LOGGING IN...' : (
                   <>
@@ -229,6 +312,35 @@ export default function Login() {
               </button>
             </div>
           </form>
+
+          {sqlSchema && (
+            <div className="mt-8 border-t border-slate-200 pt-6 animate-in slide-in-from-top-2">
+               <h3 className="text-xs font-bold text-slate-800 mb-2">SUPABASE SCHEMA SQL</h3>
+               <p className="text-[10px] text-slate-500 mb-4 normal-case leading-relaxed">
+                 <strong className="text-red-500">Do NOT just type "supabase-schema.sql". You must copy the actual SQL code text below.</strong><br/> Copy the <strong>entire</strong> multi-line SQL code block shown in the box below, open your Supabase project online, navigate to the <b>SQL Editor</b>, paste the whole code in, and click "Run".
+               </p>
+               <button 
+                 onClick={() => {
+                    try {
+                       navigator.clipboard.writeText(sqlSchema);
+                       alert("SQL Schema copied to clipboard! (If this didn't work, please manually select the text inside the box below and copy it).");
+                    } catch(e) {
+                       alert("Automatic copy failed. Please manually select the text inside the box below and copy it.");
+                    }
+                 }}
+                 className="w-full mb-3 flex justify-center items-center gap-2 py-3 bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold rounded transition-colors shadow"
+               >
+                  COPY FULL SQL TO CLIPBOARD
+               </button>
+               <div className="relative">
+                 <textarea 
+                   readOnly 
+                   className="w-full h-48 p-3 text-[10px] font-mono bg-slate-50 border border-slate-300 rounded text-slate-700 outline-none" 
+                   value={sqlSchema}
+                 />
+               </div>
+            </div>
+          )}
         </div>
         
         <div className="mt-8 text-center text-slate-400 text-[7px] font-black tracking-[0.4em] opacity-50">

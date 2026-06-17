@@ -1,0 +1,61 @@
+src/pages/PurchaseManagement.tsx:        alert(data.message || 'Error fetching invoice details');
+src/pages/PurchaseManagement.tsx:      alert('Network error fetching invoice details');
+src/pages/PurchaseManagement.tsx:      alert('Please fill all required fields');
+src/pages/PurchaseManagement.tsx:        alert(data.message);
+src/pages/PurchaseManagement.tsx:    } catch (err) { alert('Error processing invoice'); }
+src/pages/PurchaseManagement.tsx:        alert(data.message);
+src/pages/PurchaseManagement.tsx:        alert(data.message || 'Error fetching invoice for edit');
+src/pages/PurchaseManagement.tsx:      alert('Network error fetching invoice for edit');
+src/pages/CreditEngine.tsx:        alert(data.message);
+src/pages/CreditEngine.tsx:      alert('Error saving config');
+src/pages/UserManagement.tsx:        alert(data.message || 'Error saving user');
+src/pages/UserManagement.tsx:      alert('Error saving user');
+src/pages/UserManagement.tsx:      else alert(data.message);
+src/pages/UserManagement.tsx:      else alert(data.message);
+src/pages/CreditCustomers.tsx:          alert('Failed to delete: ' + data.message);
+src/pages/CreditCustomers.tsx:        alert('Error deleting customer');
+src/pages/CreditCustomers.tsx:        alert('Please fill in all required fields: Name, Working Place, Passport No, Monthly Limit, and Auto Burn Start Date.');
+src/pages/CreditCustomers.tsx:      } else { alert('Error: ' + data.message); }
+src/pages/CreditCustomers.tsx:    } catch (err) { console.error(err); alert('Error saving customer: ' + err); }
+src/pages/CreditCustomers.tsx:    if (!importFile) return alert('Select a file first');
+src/pages/StockAdjustment.tsx:      alert('No unadjusted items with stock differences found in this session.');
+src/pages/ProductManagement.tsx:        alert(data.message || 'Error saving product');
+src/pages/ProductManagement.tsx:      alert('Error connecting to server');
+src/pages/ProductManagement.tsx:      else alert(data.message);
+src/pages/ProductManagement.tsx:    if (!importFile) return alert('Select a file first');
+src/pages/Labels.tsx:      alert("Please add products to the print list.");
+src/pages/Labels.tsx:                    alert("Barcode metadata missing.");
+src/pages/ReturnHistory.tsx:          alert('Failed to delete: ' + errMsg);
+src/pages/ReturnHistory.tsx:      alert('Delete error: ' + (err.message || String(err)));
+src/pages/Suppliers.tsx:        alert(data.message);
+src/pages/Suppliers.tsx:      alert('Error saving supplier');
+src/pages/Suppliers.tsx:      else alert(data.message);
+src/pages/InventoryAudit.tsx:        alert(resData.message || 'Error deleting session');
+src/pages/InventoryAudit.tsx:      alert('An error occurred during deletion.');
+src/pages/InventoryAudit.tsx:        alert(`Error deleting item: ${resData.message || 'Unknown error'}`);
+src/pages/InventoryAudit.tsx:        alert(data.message || 'Failed to start audit session.');
+src/pages/InventoryAudit.tsx:      alert('Audit service is currently unavailable.');
+src/pages/InventoryAudit.tsx:      alert("The session has already been adjusted, and can not be edited or deleted.");
+src/pages/InventoryAudit.tsx:      alert("The session has already been adjusted, and can not be edited or deleted.");
+src/pages/InventoryAudit.tsx:        alert(error.message || 'Error updating item');
+src/pages/InventoryAudit.tsx:        alert(error.message || 'Error completing session');
+src/pages/InventoryAudit.tsx:                                                     alert("The session has already been adjusted, and can not be edited or deleted.");
+src/pages/InventoryAudit.tsx:                                                     alert("The session has already been adjusted, and can not be edited or deleted.");
+src/pages/SupplierReturns.tsx:      alert(`Missing required information:\n- ${missingFields.join('\n- ')}`);
+src/pages/SupplierReturns.tsx:        alert("Failed: " + data.message);
+src/pages/SupplierReturns.tsx:      alert("An error occurred");
+src/pages/Customers.tsx:      } else { alert(data.message); }
+src/pages/Customers.tsx:    } catch (err) { alert('Error saving customer'); }
+src/pages/Customers.tsx:    if (!paymentAmount || Number(paymentAmount) <= 0) return alert('Enter valid amount');
+src/pages/Customers.tsx:      } else { alert(data.message); }
+src/pages/Customers.tsx:    } catch (err) { alert('Error processing payment'); }
+src/pages/Customers.tsx:    } catch (err) { alert('Error saving settings'); }
+src/pages/Customers.tsx:    } catch (err) { alert('Error updating status'); }
+src/pages/Customers.tsx:    if (isNaN(newLimit)) return alert('Invalid number');
+src/pages/Customers.tsx:    } catch (err) { alert('Error updating limit'); }
+src/pages/Customers.tsx:                          if (!importFile) return alert('Select a file first');
+src/pages/ExpenseManagement.tsx:      alert('Please fill category, amount and date');
+src/components/CustomerReturnModal.tsx:          alert(`Return failed for invoice ${saleId}: ` + data.message);
+src/components/CustomerReturnModal.tsx:      alert("Error processing return");
+src/components/POSSummaryModal.tsx:      alert('Failed to generate image. Please try again.');
+src/components/VoidSaleModal.tsx:        alert("Void processed successfully. Stock has been restored.");

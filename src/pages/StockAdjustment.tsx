@@ -205,7 +205,7 @@ export default function StockAdjustment() {
       return;
     }
 
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     setError('');
     setSuccess('');
 
@@ -265,7 +265,7 @@ export default function StockAdjustment() {
         return;
     }
 
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     setNotification({ message: `Applying adjustments for ${itemsToAdjust.length} items...`, type: 'success' });
     let successCount = 0;
     

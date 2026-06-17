@@ -1,0 +1,146 @@
+src/pages/SalesReport.tsx:      const res = await fetch(`/api/admin/detailed-sales-report-rows?${query.toString()}`, {
+src/pages/PurchaseManagement.tsx:      const res = await fetch('/api/invoice_categories', { headers: { 'Authorization': `Bearer ${token}` } });
+src/pages/PurchaseManagement.tsx:      const ptRes = await fetch('/api/payment_types', { headers: { 'Authorization': `Bearer ${token}` } });
+src/pages/PurchaseManagement.tsx:      const res = await fetch(`/api/admin/purchase-invoices?search=${searchQuery}`, {
+src/pages/PurchaseManagement.tsx:      const res = await fetch('/api/suppliers', {
+src/pages/PurchaseManagement.tsx:      const res = await fetch('/api/admin/purchase-stats', {
+src/pages/PurchaseManagement.tsx:      const res = await fetch(`/api/admin/purchase-invoices/${id}`, {
+src/pages/PurchaseManagement.tsx:      const res = await fetch(`/api/products/search?q=${query}`, {
+src/pages/PurchaseManagement.tsx:      const res = await fetch(url, {
+src/pages/PurchaseManagement.tsx:      const res = await fetch(`/api/admin/purchase-invoices/${id}/void`, {
+src/pages/PurchaseManagement.tsx:      const res = await fetch(`/api/admin/purchase-invoices/${invoiceToDelete}`, {
+src/pages/PurchaseManagement.tsx:      const res = await fetch(`/api/admin/purchase-invoices/${id}`, {
+src/pages/PurchaseManagement.tsx:      const res = await fetch(`/api/admin/purchase-invoices/${selectedInvoice.id}/payments`, {
+src/pages/CreditEngine.tsx:        fetch('/api/admin/rfid-logs', { headers: { 'Authorization': `Bearer ${token}` } }),
+src/pages/CreditEngine.tsx:        fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } }),
+src/pages/CreditEngine.tsx:        fetch('/api/admin/auto-sale-config', { headers: { 'Authorization': `Bearer ${token}` } })
+src/pages/CreditEngine.tsx:      const res = await fetch('/api/admin/auto-sale-config', {
+src/pages/CreditEngine.tsx:      const res = await fetch(`/api/admin/auto-sale-config/${config.id}`, {
+src/pages/SalesHistory.tsx:      const res = await fetch('/api/sales', {
+src/pages/SalesHistory.tsx:      const res = await fetch(`/api/sales/${id}`, {
+src/pages/UserManagement.tsx:      const res = await fetch('/api/users', {
+src/pages/UserManagement.tsx:      const res = await fetch(url, {
+src/pages/UserManagement.tsx:      const res = await fetch(`/api/users/${userToDelete}`, {
+src/pages/UserManagement.tsx:      const res = await fetch(`/api/users/${user.id}`, {
+src/pages/CreditCustomers.tsx:      const res = await fetch('/api/customers?type=WALKIN', { headers: { 'Authorization': `Bearer ${token}` } });
+src/pages/CreditCustomers.tsx:      const res = await fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } });
+src/pages/CreditCustomers.tsx:      const res = await fetch(`/api/customers/${customerToDelete}`, { 
+src/pages/CreditCustomers.tsx:      const res = await fetch(url, {
+src/pages/CreditCustomers.tsx:          const res = await fetch('/api/customers/bulk', {
+src/pages/CreditCollections.tsx:      const res = await fetch('/api/customers', { headers: { 'Authorization': `Bearer ${token}` } });
+src/pages/CreditCollections.tsx:      const res = await fetch(`/api/customers/${singlePayCustomer.id}/payment`, {
+src/pages/CreditCollections.tsx:        const res = await fetch(`/api/admin/customers/${ledgerCustomer.id}/update-limit`, {
+src/pages/CreditCollections.tsx:        const res = await fetch(`/api/admin/customers/${ledgerCustomer.id}/credit-status`, {
+src/pages/CreditCollections.tsx:      const res = await fetch(`/api/customers/${customer.id}/credit-logs`, {
+src/pages/CreditCollections.tsx:        const res = await fetch(`/api/customers/${member.id}/payment`, {
+src/pages/StockAdjustment.tsx:      const res = await fetch('/api/admin/inventory/sessions', {
+src/pages/StockAdjustment.tsx:      const res = await fetch(`/api/admin/inventory/sessions/${id}`, {
+src/pages/StockAdjustment.tsx:      const res = await fetch('/api/products', {
+src/pages/StockAdjustment.tsx:      const res = await fetch('/api/stock-adjustments', {
+src/pages/StockAdjustment.tsx:      const res = await fetch('/api/stock-adjustments', {
+src/pages/StockAdjustment.tsx:        const res = await fetch('/api/stock-adjustments', {
+src/pages/StockAdjustment.tsx:        const res = await fetch('/api/stock-adjustments', {
+src/pages/StockAdjustment.tsx:                                  const res = await fetch('/api/stock-adjustments', {
+src/pages/ProductManagement.tsx:      const res = await fetch(`/api/products/${productId}/batches`, {
+src/pages/ProductManagement.tsx:        fetch('/api/suppliers', { headers: { 'Authorization': `Bearer ${token}` } }),
+src/pages/ProductManagement.tsx:        fetch('/api/categories', { headers: { 'Authorization': `Bearer ${token}` } }),
+src/pages/ProductManagement.tsx:        fetch('/api/categories2', { headers: { 'Authorization': `Bearer ${token}` } }),
+src/pages/ProductManagement.tsx:        fetch('/api/brands', { headers: { 'Authorization': `Bearer ${token}` } }),
+src/pages/ProductManagement.tsx:        fetch('/api/units', { headers: { 'Authorization': `Bearer ${token}` } })
+src/pages/ProductManagement.tsx:      const res = await fetch(url, {
+src/pages/ProductManagement.tsx:      const res = await fetch(`/api/products/${productToDelete.id}`, {
+src/pages/ProductManagement.tsx:          const res = await fetch('/api/admin/products/bulk', {
+src/pages/CustomerReturnsReport.tsx:      const res = await fetch('/api/sales-returns');
+src/pages/PurchasePaymentPage.tsx:      const res = await fetch('/api/admin/purchase-invoices', {
+src/pages/PurchasePaymentPage.tsx:      const res = await fetch('/api/suppliers', {
+src/pages/PurchasePaymentPage.tsx:      const res = await fetch(`/api/admin/purchase-invoices/${selectedPayInvoice.id}/payments`, {
+src/pages/Labels.tsx:    fetch('/api/products')
+src/pages/ReturnHistory.tsx:      const res = await fetch(`/api/supplier-returns?t=${Date.now()}`);
+src/pages/ReturnHistory.tsx:      const res = await fetch(`/api/supplier-returns/${id}?reason=Manual%20deletion`, {
+src/pages/DeletedReturnHistory.tsx:    fetch('/api/admin/deleted-returns-logs')
+src/pages/Suppliers.tsx:      const res = await fetch('/api/suppliers', {
+src/pages/Suppliers.tsx:      const res = await fetch(url, {
+src/pages/Suppliers.tsx:      const res = await fetch(`/api/suppliers/${supplierToDelete}`, {
+src/pages/Requisition.tsx:      const res = await fetch('/api/suppliers', {
+src/pages/Requisition.tsx:      const res = await fetch(url, {
+src/pages/Reports.tsx:      const res = await fetch('/api/categories', {
+src/pages/Reports.tsx:      const res = await fetch(`/api/admin/detailed-sales-report?${query.toString()}`, {
+src/pages/InventoryAudit.tsx:      const res = await fetch('/api/stock-adjustments', {
+src/pages/InventoryAudit.tsx:      const res = await fetch(`/api/admin/inventory/sessions?t=${Date.now()}`, {
+src/pages/InventoryAudit.tsx:      const res = await fetch(`/api/admin/inventory/sessions/${id}`, {
+src/pages/InventoryAudit.tsx:      const res = await fetch(`/api/admin/inventory/sessions/${activeSession.id}/items/${itemId}`, {
+src/pages/InventoryAudit.tsx:        const sessionRes = await fetch(`/api/admin/inventory/sessions/${activeSession.id}`, {
+src/pages/InventoryAudit.tsx:      const res = await fetch('/api/admin/inventory/stats', {
+src/pages/InventoryAudit.tsx:      const res = await fetch('/api/admin/inventory/sessions', {
+src/pages/InventoryAudit.tsx:      const res = await fetch(`/api/admin/inventory/sessions/${id}`, {
+src/pages/InventoryAudit.tsx:      const res = await fetch(`/api/products/search?q=${q}`, {
+src/pages/InventoryAudit.tsx:      const res = await fetch(`/api/admin/inventory/sessions/${activeSession.id}/items`, {
+src/pages/InventoryAudit.tsx:        const sessionRes = await fetch(`/api/admin/inventory/sessions/${activeSession.id}`, {
+src/pages/InventoryAudit.tsx:      const res = await fetch(`/api/admin/inventory/sessions/${activeSession.id}/complete`, {
+src/pages/SupplierReturns.tsx:    fetch('/api/suppliers')
+src/pages/SupplierReturns.tsx:    fetch('/api/products')
+src/pages/SupplierReturns.tsx:        fetch(`/api/supplier-returns/${id}`)
+src/pages/SupplierReturns.tsx:      const res = await fetch(id ? `/api/supplier-returns/${id}` : '/api/supplier-returns', {
+src/pages/SupplierReturns.tsx:        fetch('/api/products')
+src/pages/AdminDashboard.tsx:      const res = await fetch('/api/admin/detailed-sales-report-rows?limit=100', {
+src/pages/AdminDashboard.tsx:      const res = await fetch(`/api/admin/daily-pdf-report?month=${reportMonth}`, {
+src/pages/VoidLogs.tsx:      const res = await fetch('/api/void-logs', {
+src/pages/Customers.tsx:      const res = await fetch('/api/customers?type=DELIVERY', { headers: { 'Authorization': `Bearer ${token}` } });
+src/pages/Customers.tsx:      const res = await fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } });
+src/pages/Customers.tsx:      const res = await fetch('/api/admin/credit-settings', { headers: { 'Authorization': `Bearer ${token}` } });
+src/pages/Customers.tsx:      const res = await fetch(url, {
+src/pages/Customers.tsx:      const res = await fetch(`/api/customers/${showPaymentFor.id}/payment`, {
+src/pages/Customers.tsx:      const res = await fetch('/api/admin/credit-settings', {
+src/pages/Customers.tsx:        fetch(`/api/admin/customers/${customerId}/limit-history`, { headers: { 'Authorization': `Bearer ${token}` } }),
+src/pages/Customers.tsx:        fetch(`/api/admin/customers/${customerId}/status-logs`, { headers: { 'Authorization': `Bearer ${token}` } })
+src/pages/Customers.tsx:        const res = await fetch(`/api/customers/${customerId}/auto-burn-logs`, { headers: { 'Authorization': `Bearer ${token}` } });
+src/pages/Customers.tsx:      const res = await fetch(`/api/admin/customers/${customerId}/credit-status`, {
+src/pages/Customers.tsx:      const res = await fetch(`/api/admin/customers/${customerId}/update-limit`, {
+src/pages/Customers.tsx:                                const res = await fetch('/api/customers/bulk', {
+src/pages/ProfitReport.tsx:      const res = await fetch(`/api/admin/profit-analytics?${query.toString()}`, {
+src/pages/Login.tsx:    fetch('/api/config-status')
+src/pages/Login.tsx:      const res = await fetch('/api/auth/login', {
+src/pages/MasterData.tsx:      const res = await fetch(`/api/${activeTab}`, {
+src/pages/MasterData.tsx:      const res = await fetch(url, {
+src/pages/MasterData.tsx:      const res = await fetch(`/api/${activeTab}/${itemToDelete.id}`, {
+src/pages/ExpiryInsights.tsx:      const res = await fetch(`/api/admin/expiry-insights?days=${daysThreshold}`, {
+src/pages/Settings.tsx:      const res = await fetch('/api/admin/users', {
+src/pages/Settings.tsx:    fetch('/api/settings/returns', {
+src/pages/Settings.tsx:    fetch('/api/settings/store', {
+src/pages/Settings.tsx:      const returnRes = await fetch('/api/settings/returns', {
+src/pages/Settings.tsx:      const storeRes = await fetch('/api/settings/store', {
+src/pages/Settings.tsx:      const themeRes = await fetch('/api/settings/theme', {
+src/pages/Settings.tsx:      const res = await fetch(`/api/admin/users/${passwordForm.userId}/reset-password`, {
+src/pages/POS.tsx:    fetch('/api/user/settings/pos_font_size', {
+src/pages/POS.tsx:      await fetch('/api/user/settings/pos_font_size', {
+src/pages/POS.tsx:    fetch('/api/settings/store', {
+src/pages/POS.tsx:    fetch('/api/settings/returns', {
+src/pages/POS.tsx:          const response = await fetch(`/api/products/price-check/${code}`);
+src/pages/POS.tsx:          const response = await fetch(`/api/products/barcode/${code}`);
+src/pages/POS.tsx:          fetch('/api/categories'),
+src/pages/POS.tsx:          fetch('/api/customers', { headers: { 'Authorization': `Bearer ${token}` } })
+src/pages/POS.tsx:        const response = await fetch(`/api/products/price-check/${code}`);
+src/pages/POS.tsx:        const response = await fetch(`/api/products/barcode/${code}`);
+src/pages/POS.tsx:      const res = await fetch('/api/sales', {
+src/pages/ExpenseManagement.tsx:      const res = await fetch('/api/expense_categories', {
+src/pages/ExpenseManagement.tsx:      const res = await fetch(`/api/admin/expenses?search=${searchQuery}&category=${categoryFilter}&from=${dateRange.from}&to=${dateRange.to}`, {
+src/pages/ExpenseManagement.tsx:      const res = await fetch('/api/admin/expenses', {
+src/pages/ExpenseManagement.tsx:      const res = await fetch(`/api/admin/expenses/${expenseToDelete}`, {
+src/pages/ExpenseManagement.tsx:      const res = await fetch('/api/expense_categories', {
+src/pages/ExpenseManagement.tsx:      const res = await fetch('/api/expense_categories', {
+src/pages/ExpenseManagement.tsx:      const res = await fetch(`/api/expense_categories/${encodeURIComponent(name)}`, {
+src/components/CustomerReturnModal.tsx:    fetch('/api/settings/returns', {
+src/components/CustomerReturnModal.tsx:      const res = await fetch(`/api/sales/${invoiceId.trim()}`);
+src/components/CustomerReturnModal.tsx:        const res = await fetch('/api/sales-returns', {
+src/components/PrintPreviewModal.tsx:      fetch('/api/settings/store', {
+src/components/POSSummaryModal.tsx:        const res = await fetch(`/api/pos/daily-summary?date=${selectedDate}`, {
+src/components/POSSummaryModal.tsx:        const res = await fetch('/api/settings/store', {
+src/components/ThemeProvider.tsx:        const res = await fetch('/api/settings/theme', {
+src/components/ThemeProvider.tsx:      await fetch('/api/settings/theme', {
+src/components/SystemResetView.tsx:      const res = await fetch('/api/admin/reset-system', {
+src/components/VoidSaleModal.tsx:      const res = await fetch(`/api/sales/${invoiceId.trim()}`);
+src/components/VoidSaleModal.tsx:      const res = await fetch('/api/void', {
+src/components/VoidAuthModal.tsx:      const res = await fetch('/api/void', {
+src/components/PriceCheckModal.tsx:      const res = await fetch(`/api/products/price-check/${barcode.trim()}`);
+src/store/productStore.ts:      const res = await fetch('/api/products', {
+src/main.tsx:   fetch(url, { headers: { 'Authorization': `Bearer ${token}` } }).catch(() => {});

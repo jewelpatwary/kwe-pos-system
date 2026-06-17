@@ -64,7 +64,7 @@ export default function Customers() {
 
   const fetchCustomers = async () => {
     try {
-      setLoading(true);
+      /* setLoading removed to prevent flicker */
       const res = await fetch('/api/customers?type=DELIVERY', { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
       if (data.success) setCustomers(data.data);
@@ -96,7 +96,7 @@ export default function Customers() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const url = formData.id ? `/api/customers/${formData.id}` : '/api/customers';
       const method = formData.id ? 'PUT' : 'POST';
@@ -209,7 +209,7 @@ export default function Customers() {
   const updateCreditStatus = async (customerId: any, newStatus: string) => {
     const reason = prompt(`Reason for changing status to ${newStatus}:`);
     if (reason === null) return;
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const res = await fetch(`/api/admin/customers/${customerId}/credit-status`, {
         method: 'POST',

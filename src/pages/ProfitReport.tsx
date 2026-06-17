@@ -49,7 +49,7 @@ export default function ProfitReport() {
   }, [startDate, endDate]);
 
   const fetchReport = async () => {
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const query = new URLSearchParams({ start_date: startDate, end_date: endDate });
       const res = await fetch(`/api/admin/profit-analytics?${query.toString()}`, {

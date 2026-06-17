@@ -28,7 +28,7 @@ export default function Suppliers() {
 
   const fetchSuppliers = async () => {
     try {
-      setLoading(true);
+      /* setLoading removed to prevent flicker */
       const res = await fetch('/api/suppliers', {
           headers: { 'Authorization': `Bearer ${token}` }
       });

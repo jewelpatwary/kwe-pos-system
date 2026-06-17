@@ -16,7 +16,7 @@ export default function SalesHistory() {
 
   const fetchSales = async () => {
     try {
-      setLoading(true);
+      /* setLoading removed to prevent flicker */
       const res = await fetch('/api/sales', {
         headers: { 'Authorization': `Bearer ${token}` }
       });

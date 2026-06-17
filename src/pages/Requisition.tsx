@@ -48,7 +48,7 @@ export default function Requisition() {
   };
 
   const fetchInvoices = async () => {
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       let url = `/api/admin/purchase-invoices?supplier_id=${selectedSupplierId}`;
       if (filterStatuses.length > 0 && !filterStatuses.includes('ALL')) {

@@ -64,7 +64,7 @@ export default function ExpenseManagement() {
   };
 
   const fetchExpenses = async () => {
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const res = await fetch(`/api/admin/expenses?search=${searchQuery}&category=${categoryFilter}&from=${dateRange.from}&to=${dateRange.to}`, {
         headers: { 'Authorization': `Bearer ${token}` }

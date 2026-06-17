@@ -52,7 +52,7 @@ export default function MasterData() {
   }, [activeTab]);
 
   const fetchData = async () => {
-    setLoading(true);
+    /* setLoading removed to prevent flicker */
     try {
       const res = await fetch(`/api/${activeTab}`, {
         headers: { 'Authorization': `Bearer ${token}` }
