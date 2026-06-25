@@ -99,6 +99,14 @@ export default function Settings() {
     { value: 'Lobster', label: 'Lobster' },
     { value: 'Permanent Marker', label: 'Permanent Marker' },
     { value: 'Satisfy', label: 'Satisfy' },
+    { value: 'Arial', label: 'Arial' },
+    { value: 'Verdana', label: 'Verdana' },
+    { value: 'Times New Roman', label: 'Times New Roman' },
+    { value: 'Tahoma', label: 'Tahoma' },
+    { value: 'Courier New', label: 'Courier New' },
+    { value: 'Trebuchet MS', label: 'Trebuchet MS' },
+    { value: 'Georgia', label: 'Georgia' },
+    { value: 'Palatino', label: 'Palatino' },
     { value: 'Varela Round', label: 'Varela Round' }
   ];
 

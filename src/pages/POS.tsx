@@ -152,46 +152,7 @@ export default function POS() {
     return targetDate.toISOString();
   };
 
-  const [onlineStatus, setOnlineStatus] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
-  const [pendingSyncCount, setPendingSyncCount] = useState(0);
-
-  const updatePendingSyncCount = () => {
-    // OFFLINE STORAGE DISABLED
-    setPendingSyncCount(0);
-  };
-
-  const triggerSync = async () => {
-    // OFFLINE SYNC DISABLED
-    return;
-  };
-
-  useEffect(() => {
-    updatePendingSyncCount();
-  }, [receiptData]);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setOnlineStatus(true);
-      triggerSync();
-    };
-    const handleOffline = () => setOnlineStatus(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    const syncInterval = setInterval(() => {
-      if (navigator.onLine) {
-        triggerSync();
-      }
-    }, 12000);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      clearInterval(syncInterval);
-    };
-  }, [token]);
 
   useEffect(() => {
     fetch('/api/settings/store', {
@@ -620,8 +581,7 @@ export default function POS() {
     };
 
     let data: any = null;
-    let isOffline = false;
-
+    
     try {
       const res = await fetch('/api/sales', {
         method: 'POST',
@@ -634,7 +594,7 @@ export default function POS() {
       data = await res.json();
     } catch (err) {
       console.warn("Sale network fetch failed.");
-      setErrorMsg("Transaction failed: Network error. Data not saved.");
+      alert("Transaction failed: Network error. Sale could not be saved to server.");
       return;
     }
 

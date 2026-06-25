@@ -126,6 +126,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       // For Google Fonts, use the name as fallback
       fontStack = `"${fontFamily}", sans-serif`;
+      
+      // Load font dynamically
+      const fontName = fontFamily.replace(' ', '+');
+      const linkId = `font-${fontName}`;
+      if (!document.getElementById(linkId)) {
+          const link = document.createElement('link');
+          link.id = linkId;
+          link.href = `https://fonts.googleapis.com/css2?family=${fontName}&display=swap`;
+          link.rel = 'stylesheet';
+          document.head.appendChild(link);
+      }
     }
     
     root.style.setProperty('--font-family-global', fontStack);

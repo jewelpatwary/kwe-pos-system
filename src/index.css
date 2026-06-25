@@ -4,7 +4,7 @@
 
 @theme {
   --font-sans: var(--font-family-global), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-mono: var(--font-family-global), ui-monospace, SFMono-Regular, monospace;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
