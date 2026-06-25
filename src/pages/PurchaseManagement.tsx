@@ -151,40 +151,42 @@ export default function PurchaseManagement() {
   };
 
   const addItem = (product: any) => {
-    const existing = newInvoice.items.find(i => i.product_id === product.id);
-    if (existing) return;
+    setNewInvoice(prev => {
+      const existing = prev.items.find(i => i.product_id === product.id);
+      if (existing) return prev;
 
-    setNewInvoice({
-      ...newInvoice,
-      items: [...newInvoice.items, {
-        product_id: product.id,
-        name: product.name,
-        barcode: product.barcode,
-        quantity: 1,
-        bonus_qty: 0,
-        unit_price: product.purchase_price || 0,
-        batch_number: '',
-        expiry_date: product.expiry_enabled ? new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] : null,
-        expiry_enabled: product.expiry_enabled,
-        category_name: product.category2_name || 'N/A'
-      }]
+      return {
+        ...prev,
+        items: [...prev.items, {
+          product_id: product.id,
+          name: product.name,
+          barcode: product.barcode,
+          quantity: 1,
+          bonus_qty: 0,
+          unit_price: product.purchase_price || 0,
+          batch_number: '',
+          expiry_date: product.expiry_enabled ? new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] : null,
+          expiry_enabled: product.expiry_enabled,
+          category_name: product.category2_name || 'N/A'
+        }]
+      };
     });
     setProductSearch('');
     setProductResults([]);
   };
 
   const removeItem = (id: number) => {
-    setNewInvoice({
-      ...newInvoice,
-      items: newInvoice.items.filter(i => i.product_id !== id)
-    });
+    setNewInvoice(prev => ({
+      ...prev,
+      items: prev.items.filter(i => i.product_id !== id)
+    }));
   };
 
   const updateItem = (id: number, field: string, value: any) => {
-    setNewInvoice({
-      ...newInvoice,
-      items: newInvoice.items.map(i => i.product_id === id ? { ...i, [field]: value } : i)
-    });
+    setNewInvoice(prev => ({
+      ...prev,
+      items: prev.items.map(i => i.product_id === id ? { ...i, [field]: value } : i)
+    }));
   };
 
   const totalAmount = newInvoice.items.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0);
@@ -402,7 +404,7 @@ export default function PurchaseManagement() {
                         {productResults.length > 0 && (
                             <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded shadow-lg z-50 max-h-60 overflow-y-auto">
                               {productResults.map(p => (
-                                <button key={p.id} onClick={() => addItem(p)} className="w-full px-4 py-3 text-left hover:bg-slate-50 border-b last:border-0 text-sm">
+                                <button type="button" key={p.id} onClick={() => addItem(p)} className="w-full px-4 py-3 text-left hover:bg-slate-50 border-b last:border-0 text-sm">
                                     <div className="font-medium">{p.name}</div>
                                     <div className="text-xs text-slate-500">{p.barcode}</div>
                                 </button>

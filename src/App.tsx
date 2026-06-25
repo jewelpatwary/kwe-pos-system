@@ -35,6 +35,7 @@ import CreditCollections from './pages/CreditCollections';
 import CreditEngine from './pages/CreditEngine';
 import PurchasePaymentPage from './pages/PurchasePaymentPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import OfflineOverlay from './components/OfflineOverlay';
 
 function App() {
   const [activeShop, setActiveShop] = useState<string | null>(localStorage.getItem('activeShop'));
@@ -49,6 +50,7 @@ function App() {
 
   return (
     <ThemeProvider>
+      <OfflineOverlay />
       <BrowserRouter>
         {!activeShop ? (
           <ShopSelect onShopSelect={handleShopSelect} />

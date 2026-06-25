@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../components/ThemeProvider';
-import { useReactToPrint } from 'react-to-print';
+import PrintPreviewModal from '../components/PrintPreviewModal';
 
 export default function Requisition() {
   const { token } = useAuthStore();
@@ -17,12 +17,7 @@ export default function Requisition() {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterStatuses, setFilterStatuses] = useState<string[]>(['DUE']);
-  
-  const printRef = useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: 'Purchase_Requisition',
-  });
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   useEffect(() => {
     fetchSuppliers();
@@ -101,6 +96,109 @@ export default function Requisition() {
     ? `WK${getWeekOfMonth(selectedInvoicesData[0].date)}`
     : `WK${Math.ceil(new Date().getDate() / 7)}`;
 
+  const renderTemplateContent = () => (
+    <div className="w-full flex-1 flex flex-col font-mono text-left bg-white text-slate-900" style={{ fontFamily: 'monospace' }}>
+       {/* TEMPLATE HEADER */}
+       <div className="mb-6">
+          <h1 className="text-xl md:text-2xl font-bold bg-white text-black py-2 border-b-2 border-black text-left leading-tight">
+            BINA SENTUHAN TRANSACTION SUMMARY OF CREDIT FOR {currentMonthYear.month}'{currentMonthYear.year} {currentWeek}
+          </h1>
+          <div className="flex justify-end mt-2 text-xs italic text-slate-500 font-bold">
+             LAST UPDATE : {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-')}
+          </div>
+       </div>
+
+       <div className="mb-4 text-left">
+          <h2 className="text-base font-bold border-b-2 border-black inline-block pb-1">
+            SUPPLIER NAME: {suppliers.find(s => s.id.toString() === selectedSupplierId)?.name || 'N/A'}
+          </h2>
+       </div>
+
+       {/* TEMPLATE TABLE */}
+       <table className="w-full border-collapse border border-black mb-6 text-xs text-slate-900 font-mono">
+          <thead>
+             <tr className="bg-slate-100/90 font-bold text-black border-b border-black">
+                <th className="border border-black p-1.5 text-center">DATE</th>
+                <th className="border border-black p-1.5 text-left">COMPANY NAME</th>
+                <th className="border border-black p-1.5 text-center">INV NO.</th>
+                <th className="border border-black p-1.5 text-center">CATEGORY</th>
+                <th className="border border-black p-1.5 text-center">PAID BY</th>
+                <th className="border border-black p-1.5 text-center">TYPE</th>
+                <th className="border border-black p-1.5 text-center">WEEK</th>
+                <th className="border border-black p-1.5 text-right">AMOUNT ({currency.symbol})</th>
+             </tr>
+          </thead>
+          <tbody>
+             {selectedInvoicesData.map((inv) => (
+                <tr key={inv.id} className="border-b border-black">
+                   <td className="border border-black p-1.5 text-center">
+                     {new Date(inv.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-')}
+                   </td>
+                   <td className="border border-black p-1.5 text-left">{inv.supplier_name}</td>
+                   <td className="border border-black p-1.5 text-center font-bold">{inv.invoice_number}</td>
+                   <td className="border border-black p-1.5 text-center italic text-slate-700">{inv.category_name}</td>
+                   <td className="border border-black p-1.5 text-center text-slate-700">KL PAID</td>
+                   <td className="border border-black p-1.5 text-center text-slate-700">{inv.payment_type}</td>
+                   <td className="border border-black p-1.5 text-center font-bold">W{getWeekOfMonth(inv.date)}</td>
+                   <td className="border border-black p-1.5 text-right font-bold">
+                     {(inv.due_amount || inv.total_amount).toFixed(2)}
+                   </td>
+                </tr>
+             ))}
+             {/* Empty rows to maintain structure if needed */}
+             {[...Array(Math.max(0, 5 - selectedInvoiceIds.length))].map((_, i) => (
+                <tr key={`empty-${i}`} className="border-b border-black">
+                   <td className="border border-black p-1.5 h-8"></td>
+                   <td className="border border-black p-1.5"></td>
+                   <td className="border border-black p-1.5"></td>
+                   <td className="border border-black p-1.5"></td>
+                   <td className="border border-black p-1.5"></td>
+                   <td className="border border-black p-1.5"></td>
+                   <td className="border border-black p-1.5"></td>
+                   <td className="border border-black p-1.5"></td>
+                </tr>
+             ))}
+             <tr className="bg-slate-50 border-t-2 border-black font-bold">
+                <td colSpan={7} className="border border-black p-2 text-right font-black text-xs uppercase">TOTAL :</td>
+                <td className="border-2 border-black p-2 text-right font-black text-xs underline decoration-double underline-offset-4 font-mono text-black">
+                  {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+             </tr>
+          </tbody>
+       </table>
+
+       {/* TEMPLATE FOOTER */}
+       <div className="mt-auto pt-10 grid grid-cols-3 gap-8 text-center text-xs font-bold text-black font-mono">
+          <div className="flex flex-col items-center">
+             <div className="font-bold border-b border-slate-900 w-full pb-1 mb-1">Requested By,</div>
+             <div className="h-14 flex items-end justify-center w-full">
+                <div className="w-full border-b border-black border-dotted"></div>
+             </div>
+             <div className="mt-2 font-bold uppercase">JAMAL</div>
+             <div className="text-[9px] italic font-normal text-slate-500">Applicant</div>
+          </div>
+
+          <div className="flex flex-col items-center">
+             <div className="font-bold border-b border-slate-900 w-full pb-1 mb-1">Verified By,</div>
+             <div className="h-14 flex items-end justify-center w-full">
+                <div className="w-full border-b border-black border-dotted"></div>
+             </div>
+             <div className="mt-2 font-bold uppercase">HOW</div>
+             <div className="text-[9px] italic font-normal text-slate-500">Admin department</div>
+          </div>
+
+          <div className="flex flex-col items-center">
+             <div className="font-bold border-b border-slate-900 w-full pb-1 mb-1">Approved By,</div>
+             <div className="h-14 flex items-end justify-center w-full">
+                <div className="w-full border-b border-black border-dotted"></div>
+             </div>
+             <div className="mt-2 font-bold uppercase"></div>
+             <div className="text-[9px] italic font-normal text-slate-500">M. Director</div>
+          </div>
+       </div>
+    </div>
+  );
+
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-800 font-sans text-xs uppercase">
       {/* Filters Header */}
@@ -155,7 +253,7 @@ export default function Requisition() {
 
           <div className="ml-auto flex gap-3">
              <button 
-              onClick={handlePrint}
+              onClick={() => setShowPrintModal(true)}
               disabled={selectedInvoiceIds.length === 0}
               className="px-6 py-2 bg-indigo-600 text-white rounded font-black flex items-center gap-2 hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:shadow-none"
              >
@@ -210,7 +308,7 @@ export default function Requisition() {
                   <div className="flex justify-between items-center">
                     <div className="flex flex-col">
                        <span className="text-slate-400 text-[8px] tracking-widest flex items-center gap-1">
-                         <Calendar className="w-2.5 h-2.5" /> {new Date(inv.date).toLocaleDateString()}
+                          <Calendar className="w-2.5 h-2.5" /> {new Date(inv.date).toLocaleDateString()}
                        </span>
                        <span className="text-[8px] text-slate-500 font-bold uppercase">{inv.category_name}</span>
                     </div>
@@ -234,112 +332,22 @@ export default function Requisition() {
              </div>
            ) : (
              <div 
-               ref={printRef}
-               className="bg-white w-full max-w-5xl shadow-2xl p-12 min-h-[1056px] flex flex-col print:shadow-none print:p-8"
-               style={{ fontFamily: 'monospace' }}
+               className="bg-white w-full max-w-5xl shadow-2xl p-12 min-h-[1056px] flex flex-col"
              >
-                {/* TEMPLATE HEADER */}
-                <div className="mb-8">
-                   <h1 className="text-2xl font-bold bg-white text-black py-2 border-b-2 border-black">
-                     BINA SENTUHAN TRANSACTION SUMMARY OF CREDIT FOR {currentMonthYear.month}'{currentMonthYear.year} {currentWeek}
-                   </h1>
-                   <div className="flex justify-end mt-2 text-sm italic">
-                      LAST UPDATE : {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-')}
-                   </div>
-                </div>
-
-                <div className="mb-6">
-                   <h2 className="text-lg font-bold border-b border-black inline-block pb-1">
-                     SUPPLIER NAME: {suppliers.find(s => s.id.toString() === selectedSupplierId)?.name || 'N/A'}
-                   </h2>
-                </div>
-
-                {/* TEMPLATE TABLE */}
-                <table className="w-full border-collapse border border-black mb-10">
-                   <thead>
-                      <tr className="bg-slate-200/80">
-                         <th className="border border-black p-2 text-center text-[11px]">DATE</th>
-                         <th className="border border-black p-2 text-center text-[11px]">COMPANY NAME</th>
-                         <th className="border border-black p-2 text-center text-[11px]">INV NO.</th>
-                         <th className="border border-black p-2 text-center text-[11px]">CATEGORY</th>
-                         <th className="border border-black p-2 text-center text-[11px]">PAID BY</th>
-                         <th className="border border-black p-2 text-center text-[11px]">TYPE</th>
-                         <th className="border border-black p-2 text-center text-[11px]">WEEK</th>
-                         <th className="border border-black p-2 text-center text-[11px]">AMOUNT</th>
-                      </tr>
-                   </thead>
-                   <tbody>
-                      {selectedInvoicesData.map((inv, idx) => (
-                        <tr key={inv.id}>
-                           <td className="border border-black p-2 text-center text-[11px]">
-                             {new Date(inv.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-')}
-                           </td>
-                           <td className="border border-black p-2 text-[11px]">{inv.supplier_name}</td>
-                           <td className="border border-black p-2 text-center text-[11px]">{inv.invoice_number}</td>
-                           <td className="border border-black p-2 text-center text-[11px] italic">{inv.category_name}</td>
-                           <td className="border border-black p-2 text-center text-[11px]">KL PAID</td>
-                           <td className="border border-black p-2 text-center text-[11px]">{inv.payment_type}</td>
-                           <td className="border border-black p-2 text-center text-[11px]">W{getWeekOfMonth(inv.date)}</td>
-                           <td className="border border-black p-2 text-right text-[11px] font-bold">
-                             {(inv.due_amount || inv.total_amount).toFixed(2)}
-                           </td>
-                        </tr>
-                      ))}
-                      {/* Empty rows to maintain structure if needed */}
-                      {[...Array(Math.max(0, 5 - selectedInvoiceIds.length))].map((_, i) => (
-                        <tr key={`empty-${i}`}>
-                           <td className="border border-black p-2 h-8"></td>
-                           <td className="border border-black p-2"></td>
-                           <td className="border border-black p-2"></td>
-                           <td className="border border-black p-2"></td>
-                           <td className="border border-black p-2"></td>
-                           <td className="border border-black p-2"></td>
-                           <td className="border border-black p-2"></td>
-                           <td className="border border-black p-2"></td>
-                        </tr>
-                      ))}
-                      <tr className="bg-slate-50">
-                         <td colSpan={7} className="border border-black p-2 text-right font-black text-xs">TOTAL :</td>
-                         <td className="border-2 border-black p-2 text-right font-black text-xs underline decoration-double underline-offset-4">
-                           {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                         </td>
-                      </tr>
-                   </tbody>
-                </table>
-
-                {/* TEMPLATE FOOTER */}
-                <div className="mt-auto pt-20 grid grid-cols-3 gap-12 text-center">
-                   <div className="flex flex-col items-center">
-                      <div className="font-bold border-b border-black w-full pb-2 mb-2">Requested By,</div>
-                      <div className="h-20 flex items-end justify-center w-full">
-                         <div className="w-full border-b border-black border-dotted"></div>
-                      </div>
-                      <div className="mt-2 font-bold uppercase">JAMAL</div>
-                      <div className="text-[10px] italic">Applicant</div>
-                   </div>
-
-                   <div className="flex flex-col items-center">
-                      <div className="font-bold border-b border-black w-full pb-2 mb-2">Verified By,</div>
-                      <div className="h-20 flex items-end justify-center w-full">
-                         <div className="w-full border-b border-black border-dotted"></div>
-                      </div>
-                      <div className="mt-2 font-bold uppercase">HOW</div>
-                      <div className="text-[10px] italic">Admin department</div>
-                   </div>
-
-                   <div className="flex flex-col items-center">
-                      <div className="font-bold border-b border-black w-full pb-2 mb-2">Approved By,</div>
-                      <div className="h-20 flex items-end justify-center w-full">
-                         <div className="w-full border-b border-black border-dotted"></div>
-                      </div>
-                      <div className="mt-2 font-bold uppercase"></div>
-                      <div className="text-[10px] italic">M. Director</div>
-                   </div>
-                </div>
+                {renderTemplateContent()}
              </div>
            )}
         </div>
       </div>
+
+      <PrintPreviewModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        title="Purchase Requisition Summary Report"
+        hideHeader={true}
+      >
+        {renderTemplateContent()}
+      </PrintPreviewModal>
     </div>
   );
 }

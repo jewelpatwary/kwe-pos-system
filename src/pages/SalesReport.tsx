@@ -129,7 +129,7 @@ export default function SalesReport() {
                         <td className="py-3 px-4 text-right border-r border-slate-100 text-emerald-600 font-black underline decoration-emerald-100 underline-offset-4">
                            {currency.symbol}{row.cash_amount.toFixed(2)}
                         </td>
-                        <td className="py-3 px-4 text-right border-r border-slate-100 text-indigo-600 font-black underline decoration-indigo-200 underline-offset-4">
+                        <td className="py-3 px-4 text-right border-r border-slate-100 text-blue-600 font-black underline decoration-blue-100 underline-offset-4">
                            {currency.symbol}{row.online_amount.toFixed(2)}
                         </td>
                         <td className="py-3 px-4 text-right border-r border-slate-100 text-indigo-600 font-black underline decoration-indigo-200 underline-offset-4">

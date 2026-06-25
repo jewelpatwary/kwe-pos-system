@@ -33,12 +33,13 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../components/ThemeProvider';
+import { formatDate } from '../lib/utils';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ef4444', '#ec4899', '#8b5cf6'];
 
 export default function Reports() {
   const navigate = useNavigate();
-  const { currency } = useTheme();
+  const { currency, dateFormat } = useTheme();
   const [reportType, setReportType] = useState('sales');
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ export default function Reports() {
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   
-  const [activeTab, setActiveTab] = useState<'summary' | 'items' | 'sales_by_category'>('summary');
+  const activeTab = 'summary';
   
   const { token } = useAuthStore();
 
@@ -174,27 +175,6 @@ export default function Reports() {
         </select>
 
         <div className="flex-1"></div>
-
-        <div className="flex gap-2 p-1 bg-slate-100 border border-slate-200 rounded">
-          <button 
-            onClick={() => setActiveTab('summary')}
-            className={`px-3 py-1 rounded text-[8px] font-black tracking-widest transition-all ${activeTab === 'summary' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 '}`}
-          >
-            Summary View
-          </button>
-          <button 
-             onClick={() => setActiveTab('items')}
-             className={`px-3 py-1 rounded text-[8px] font-black tracking-widest transition-all ${activeTab === 'items' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 '}`}
-          >
-            Item Metrics
-          </button>
-          <button 
-             onClick={() => setActiveTab('sales_by_category')}
-             className={`px-3 py-1 rounded text-[8px] font-black tracking-widest transition-all ${activeTab === 'sales_by_category' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 '}`}
-          >
-            Sales by Category
-          </button>
-        </div>
       </div>
 
       <div className="flex-1 overflow-auto border-x border-slate-200 bg-white">
@@ -206,103 +186,63 @@ export default function Reports() {
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200">
               <tr className="text-slate-500 bg-slate-50/80 backdrop-blur-md transition-colors">
-                {activeTab === 'summary' ? (
-                  <>
-                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Date</th>
-                    {reportData.dailyPivot?.categories?.map((cat: string) => (
-                      <th key={cat} className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">{cat}</th>
-                    ))}
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Cash Sales</th>
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">TNG Sales</th>
-                    <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Total Amount</th>
-                  </>
-                ) : activeTab === 'sales_by_category' ? (
-                  <>
-                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Category Name</th>
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Total Quantity</th>
-                    <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Total Value</th>
-                  </>
-                ) : (
-                  <>
-                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Product Name</th>
-                    <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Category</th>
-                    <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Quantity</th>
-                    <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Total Sales</th>
-                  </>
-                )}
+                <th className="py-4 px-6 font-black border-r border-slate-200 uppercase tracking-widest text-[9px]">Date</th>
+                {reportData.dailyPivot?.categories?.map((cat: string) => (
+                  <th key={cat} className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">{cat}</th>
+                ))}
+                <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">Cash Sales</th>
+                <th className="py-4 px-6 font-black text-center border-r border-slate-200 uppercase tracking-widest text-[9px]">TNG Sales</th>
+                <th className="py-4 px-6 font-black text-right uppercase tracking-widest text-[9px]">Total Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 transition-colors">
-              {activeTab === 'summary' ? (
-                <>
-                  {reportData.dailyPivot?.rows?.map((row: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-4 px-6 border-r border-slate-200 text-slate-900 font-bold">{row.date}</td>
-                      {reportData.dailyPivot.categories?.map((cat: string) => (
-                        <td key={cat} className="py-4 px-6 border-r border-slate-200 text-center font-semibold text-slate-700">
-                          {currency.symbol}{(row.values?.[cat] || 0).toFixed(2)}
-                        </td>
-                      ))}
-                      <td className="py-4 px-6 border-r border-slate-200 text-center font-semibold text-slate-700">
-                        {currency.symbol}{(row.cash || 0).toFixed(2)}
-                      </td>
-                      <td className="py-4 px-6 border-r border-slate-200 text-center font-semibold text-slate-700">
-                        {currency.symbol}{(row.tng || 0).toFixed(2)}
-                      </td>
-                      <td className="py-4 px-6 text-right text-slate-900 font-black bg-slate-50">
-                        {currency.symbol}{row.total.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                  {reportData.dailyPivot?.rows?.length > 0 && (
-                    <tr className="bg-slate-100 border-t-2 border-slate-300 font-black text-[10px]">
-                      <td className="py-4 px-6 border-r border-slate-200 text-slate-900">Total</td>
-                      {reportData.dailyPivot.categories?.map((cat: string) => {
-                        const totalCat = reportData.dailyPivot.rows.reduce((sum: number, r: any) => sum + (r.values?.[cat] || 0), 0);
-                        return (
-                          <td key={cat} className="py-4 px-6 border-r border-slate-200 text-center text-slate-900">
-                            {currency.symbol}{totalCat.toFixed(2)}
-                          </td>
-                        );
-                      })}
-                      <td className="py-4 px-6 border-r border-slate-200 text-center text-slate-900">
-                        {currency.symbol}{reportData.dailyPivot.rows.reduce((sum: number, r: any) => sum + (r.cash || 0), 0).toFixed(2)}
-                      </td>
-                      <td className="py-4 px-6 border-r border-slate-200 text-center text-slate-900">
-                        {currency.symbol}{reportData.dailyPivot.rows.reduce((sum: number, r: any) => sum + (r.tng || 0), 0).toFixed(2)}
-                      </td>
-                      <td className="py-4 px-6 text-right text-indigo-600 bg-slate-200">
-                        {currency.symbol}{reportData.dailyPivot.rows.reduce((sum: number, r: any) => sum + r.total, 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  )}
-                  {(!reportData.dailyPivot?.rows || reportData.dailyPivot.rows.length === 0) && (
-                    <tr>
-                      <td colSpan={4 + (reportData.dailyPivot?.categories?.length || 0)} className="py-8 text-center text-slate-400">
-                        No sales found for the selected period
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ) : activeTab === 'sales_by_category' ? (
-                reportData.categoryBreakdown?.map((cat: any, i: number) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-4 px-6 border-r border-slate-200 text-slate-900 font-black italic">{cat.category_name}</td>
-                    <td className="py-4 px-6 border-r border-slate-200 text-center text-slate-600 font-bold italic">{cat.total_qty} units</td>
-                    <td className="py-4 px-6 text-right text-indigo-600 font-black italic">{currency.symbol}{cat.total_value.toFixed(2)}</td>
-                  </tr>
-                ))
-              ) : (
-                reportData.itemDetails?.map((item: any, i: number) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-4 px-6 border-r border-slate-200 text-slate-900 font-black italic tracking-widest">{item.product_name}</td>
-                    <td className="py-4 px-6 border-r border-slate-200">
-                      <span className="px-2 py-0.5 rounded border border-slate-200 text-slate-400 font-black italic">{item.category_name}</span>
+              {reportData.dailyPivot?.rows?.map((row: any, i: number) => (
+                <tr key={i} className="hover:bg-slate-50 transition-colors">
+                  <td className="py-4 px-6 border-r border-slate-200 text-slate-900 font-bold">{formatDate(row.date, dateFormat)}</td>
+                  {reportData.dailyPivot.categories?.map((cat: string) => (
+                    <td key={cat} className="py-4 px-6 border-r border-slate-200 text-center font-semibold text-slate-700">
+                      {currency.symbol}{(row.values?.[cat] || 0).toFixed(2)}
                     </td>
-                    <td className="py-4 px-6 border-r border-slate-200 text-center font-bold text-slate-500">{item.total_qty} units</td>
-                    <td className="py-4 px-6 text-right text-slate-900 font-black italic">{currency.symbol}{item.total_value.toFixed(2)}</td>
-                  </tr>
-                ))
+                  ))}
+                  <td className="py-4 px-6 border-r border-slate-200 text-center font-semibold text-slate-700">
+                    {currency.symbol}{(row.cash || 0).toFixed(2)}
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-200 text-center font-semibold text-slate-700">
+                    {currency.symbol}{(row.tng || 0).toFixed(2)}
+                  </td>
+                  <td className="py-4 px-6 text-right text-slate-900 font-black bg-slate-50">
+                    {currency.symbol}{row.total.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+              {reportData.dailyPivot?.rows?.length > 0 && (
+                <tr className="bg-slate-100 border-t-2 border-slate-300 font-black text-[10px]">
+                  <td className="py-4 px-6 border-r border-slate-200 text-slate-900">Total</td>
+                  {reportData.dailyPivot.categories?.map((cat: string) => {
+                    const totalCat = reportData.dailyPivot.rows.reduce((sum: number, r: any) => sum + (r.values?.[cat] || 0), 0);
+                    return (
+                      <td key={cat} className="py-4 px-6 border-r border-slate-200 text-center text-slate-900">
+                        {currency.symbol}{totalCat.toFixed(2)}
+                      </td>
+                    );
+                  })}
+                  <td className="py-4 px-6 border-r border-slate-200 text-center text-slate-900">
+                    {currency.symbol}{reportData.dailyPivot.rows.reduce((sum: number, r: any) => sum + (r.cash || 0), 0).toFixed(2)}
+                  </td>
+                  <td className="py-4 px-6 border-r border-slate-200 text-center text-slate-900">
+                    {currency.symbol}{reportData.dailyPivot.rows.reduce((sum: number, r: any) => sum + (r.tng || 0), 0).toFixed(2)}
+                  </td>
+                  <td className="py-4 px-6 text-right text-indigo-600 bg-slate-200">
+                    {currency.symbol}{reportData.dailyPivot.rows.reduce((sum: number, r: any) => sum + r.total, 0).toFixed(2)}
+                  </td>
+                </tr>
+              )}
+              {(!reportData.dailyPivot?.rows || reportData.dailyPivot.rows.length === 0) && (
+                <tr>
+                  <td colSpan={4 + (reportData.dailyPivot?.categories?.length || 0)} className="py-8 text-center text-slate-400">
+                    No sales found for the selected period
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

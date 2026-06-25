@@ -79,6 +79,12 @@ Object.defineProperty(window, 'fetch', {
     
     // Non-GET or Non-API handling
     const res = await originalFetch(input, modifiedInit);
+    
+    // Clear cache on any successful mutation to ensure fresh data
+    if (res.ok && method !== 'GET' && isApi) {
+        globalFetchCache.clear();
+    }
+
     if (res.status === 401 && !isLoginEndpoint) {
       useAuthStore.getState().logout();
       return new Promise(() => {});

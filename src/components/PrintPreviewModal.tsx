@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { formatDate } from '../lib/utils';
 import { X, Printer } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { useReactToPrint } from 'react-to-print';
 
 interface PrintPreviewModalProps {
   isOpen: boolean;
@@ -9,9 +9,10 @@ interface PrintPreviewModalProps {
   title: string;
   children: React.ReactNode;
   hideHeader?: boolean;
+  isSyncing?: boolean;
 }
 
-export default function PrintPreviewModal({ isOpen, onClose, title, children, hideHeader }: PrintPreviewModalProps) {
+export default function PrintPreviewModal({ isOpen, onClose, title, children, hideHeader, isSyncing }: PrintPreviewModalProps) {
   const [storeProfile, setStoreProfile] = useState<any>(null);
   const { token } = useAuthStore();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -31,23 +32,29 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children, hi
     }
   }, [isOpen, token]);
 
-  const handlePrint = useReactToPrint({
-    contentRef: contentRef,
-    documentTitle: title,
-  });
+  const handlePrintClick = () => {
+    // Direct window.print() is 100% safe, fast, and robust across browsers & in sandboxed iframes.
+    // We combine it with advanced CSS media queries that hide other elements completely.
+    window.focus();
+    window.print();
+    // Automatically close the receipt preview after a short delay so the cashier can continue scanning instantly
+    setTimeout(() => {
+      onClose();
+    }, 1200);
+  };
 
   if (!isOpen) return null;
 
-  const now = new Date().toLocaleString();
+  const now = formatDate(new Date(), 'DD/MM/YYYY HH:mm');
 
   const isReceipt = title.toLowerCase().includes('receipt');
   const shouldHideHeader = hideHeader !== undefined ? hideHeader : isReceipt;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm no-print" id="print-modal-overlay">
-      <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" id="print-modal-overlay">
+      <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col print-modal-card">
         <div className="no-print flex justify-between items-center mb-4 border-b pb-2">
-          <h2 className="text-xl font-bold">{title}</h2>
+          <h2 className="text-xl font-bold font-sans tracking-tight">{title}</h2>
           <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
             <X size={14} />
           </button>
@@ -73,7 +80,7 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children, hi
           <button onClick={onClose} className="px-4 py-2 bg-slate-200 rounded font-bold hover:bg-slate-300">
             Close
           </button>
-          <button onClick={handlePrint} className="px-4 py-2 bg-slate-900 text-white rounded flex items-center gap-2 font-bold hover:bg-slate-800">
+          <button onClick={handlePrintClick} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded flex items-center gap-2 font-bold transition-all shadow-md active:scale-95">
             <Printer size={16} />
             Print Confirm
           </button>
@@ -81,8 +88,51 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children, hi
         
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
-            body { background: white !important; }
-            .no-print { display: none !important; }
+            /* Hide every single element in the DOM by default */
+            body * {
+              visibility: hidden !important;
+            }
+            /* Explicitly flag and show ONLY the print modal overlay container and its sub-nodes */
+            #print-modal-overlay,
+            #print-modal-overlay * {
+              visibility: visible !important;
+            }
+            body { 
+              background: white !important; 
+              color: black !important;
+            }
+            .no-print, .no-print * { 
+              display: none !important; 
+              visibility: hidden !important;
+            }
+            
+            #print-modal-overlay {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              background: white !important;
+              display: block !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              z-index: 9999999 !important;
+              backdrop-filter: none !important;
+            }
+            
+            .print-modal-card {
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              max-width: none !important;
+              max-height: none !important;
+              width: 100% !important;
+              height: auto !important;
+              overflow: visible !important;
+              background: white !important;
+            }
+
             .print-content {
               display: block !important;
               overflow: visible !important;
@@ -94,7 +144,7 @@ export default function PrintPreviewModal({ isOpen, onClose, title, children, hi
             }
             @page {
               size: ${isReceipt ? '80mm auto' : 'auto'};
-              margin: 10mm;
+              margin: 5mm;
             }
           }
         `}} />

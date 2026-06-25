@@ -14,8 +14,11 @@ export function formatDate(date: string | Date | number, format: string) {
   const day = d.getDate().toString();
   const mm = (d.getMonth() + 1).toString().padStart(2, '0');
   const dd = d.getDate().toString().padStart(2, '0');
+  const hh = d.getHours().toString().padStart(2, '0');
+  const min = d.getMinutes().toString().padStart(2, '0');
 
   switch (format) {
+    case 'DD/MM/YYYY HH:mm': return `${dd}/${mm}/${year} ${hh}:${min}`;
     case 'DD/MM/YYYY': return `${dd}/${mm}/${year}`;
     case 'YYYY-MM-DD': return `${year}-${mm}-${dd}`;
     case 'D/M/YYYY': return `${day}/${month}/${year}`;

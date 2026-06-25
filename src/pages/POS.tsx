@@ -29,7 +29,11 @@ export default function POS() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   useEffect(() => {
-    fetchProducts(token!);
+    if (token) {
+      fetchProducts(token);
+      fetchNextSaleId();
+    }
+    barcodeInputRef.current?.focus();
   }, [token]);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -52,6 +56,8 @@ export default function POS() {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showCashCalcModal, setShowCashCalcModal] = useState(false);
   const [cashAmountReceived, setCashAmountReceived] = useState('');
+  const [tngAmountReceived, setTngAmountReceived] = useState('');
+  const [activePaymentInput, setActivePaymentInput] = useState<'CASH'|'TNG'>('CASH');
   const [receiptData, setReceiptData] = useState<any>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -61,6 +67,22 @@ export default function POS() {
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [storeProfile, setStoreProfile] = useState<any>(null);
   const [posFontSize, setPosFontSize] = useState('12px');
+  const [nextSaleId, setNextSaleId] = useState<number | null>(null);
+
+  const fetchNextSaleId = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/sales/next-id', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNextSaleId(data.next_id);
+      }
+    } catch (err) {
+      console.error('Failed to fetch next sale ID:', err);
+    }
+  };
 
   const scannerStateRef = useRef({ 
     products, addItem, setSelectedCartItemId, setIsNewInput, customers, 
@@ -253,8 +275,11 @@ export default function POS() {
         }
         if (e.key === 'Enter') {
           e.preventDefault();
+          window.focus();
           window.print();
-          setReceiptData(null);
+          setTimeout(() => {
+            setReceiptData(null);
+          }, 1200);
           return;
         }
       }
@@ -273,12 +298,15 @@ export default function POS() {
         setPriceCheckSearch('');
         setTimeout(() => document.getElementById('price-check-search')?.focus(), 100);
       }
+      // Focus logic removed to prevent input stealing
+      /*
       const activeElement = document.activeElement;
-      if (activeElement?.tagName !== 'INPUT' && activeElement?.tagName !== 'TEXTAREA') {
+      if (activeElement?.id !== 'search-input' && activeElement?.tagName !== 'INPUT' && activeElement?.tagName !== 'TEXTAREA') {
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
           barcodeInputRef.current?.focus();
         }
       }
+      */
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -290,8 +318,13 @@ export default function POS() {
     let lastKeyTime = Date.now();
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if a modal is open
-      if (showPriceCheck || showCustomerModal || showSummaryModal || showReturnModal || showVoidAuthModal || showVoidSaleModal || showOptionsModal || showShortcutsModal || receiptData || showCashCalcModal) {
+      // Ignore if a modal is open or if typing in an input field (so scanner doesn't steal focus)
+      const activeTagName = document.activeElement?.tagName;
+      if (
+        activeTagName === 'INPUT' || 
+        activeTagName === 'TEXTAREA' ||
+        showPriceCheck || showCustomerModal || showSummaryModal || showReturnModal || showVoidAuthModal || showVoidSaleModal || showOptionsModal || showShortcutsModal || receiptData || showCashCalcModal
+      ) {
         return;
       }
 
@@ -541,7 +574,7 @@ export default function POS() {
     updateQuantity(selectedCartItemId, newQty);
   };
 
-  const handleCompleteSale = async (method: 'CASH' | 'CREDIT' | 'ONLINE' | 'TNG', details?: any) => {
+  const handleCompleteSale = async (method: string, details?: any) => {
     if (items.length === 0) return;
     if (method === 'CREDIT' && !selectedCustomer) {
       setShowCustomerModal(true);
@@ -549,7 +582,7 @@ export default function POS() {
     }
 
     const selectedTimestamp = getSelectedSalesTimestamp();
-    const tempSaleId = `POS-${Date.now()}`;
+    const tempSaleId = nextSaleId ? `INV-${nextSaleId}` : `POS-${Date.now()}`;
     const initialReceipt = {
       saleId: tempSaleId,
       items: [...items],
@@ -618,8 +651,9 @@ export default function POS() {
         return prev;
       });
 
-      // Refresh products in background
+      // Refresh products and next sale ID in background
       try {
+        fetchNextSaleId();
         await fetchProducts(token!);
       } catch (err) {
         console.error("Failed to refresh products after successful online checkout", err);
@@ -638,8 +672,11 @@ export default function POS() {
 
   const favoriteProducts = products.filter(p => p.is_favorite);
 
-  const parsedReceived = parseFloat(cashAmountReceived) || 0;
-  const cashChange = parsedReceived - (getTotal() - discount);
+  const parsedCash = parseFloat(cashAmountReceived) || 0;
+  const parsedTng = parseFloat(tngAmountReceived) || 0;
+  const totalReceived = parsedCash + parsedTng;
+  const totalPayable = getTotal() - discount;
+  const cashChange = totalReceived - totalPayable;
 
   return (
     <div className={`flex bg-slate-50 h-screen overflow-hidden text-slate-800 ${fontSizeClass} uppercase transition-colors duration-300`}>
@@ -653,7 +690,14 @@ export default function POS() {
             </div>
             <div>
               <h2 className="font-black text-slate-900 italic tracking-widest uppercase">Shopping Cart</h2>
-              <div className="text-[7px] text-slate-500 font-black tracking-[0.2em]">{items.length} items in basket</div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className="text-[7px] text-slate-500 font-black tracking-[0.2em]">{items.length} items in basket</div>
+                {nextSaleId && (
+                  <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[6.5px] font-black px-1 py-0.2 rounded tracking-wider">
+                    NEXT: INV-{nextSaleId}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1056,79 +1100,114 @@ export default function POS() {
 
       {showCashCalcModal && (
         <div className="fixed inset-0 z-[300] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-2xl">
-            <h2 className="text-xl font-black mb-6 flex items-center justify-between">
-              <span>CASH CALCULATION</span>
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-4xl">
+            <h2 className="text-xl font-black mb-6 flex items-center justify-between border-b pb-4">
+              <span>PAYMENT / CASH CALCULATION</span>
               <button onClick={() => setShowCashCalcModal(false)} className="text-slate-400 hover:text-slate-900">
-                <X size={14} />
+                <X size={20} />
               </button>
             </h2>
             
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
-                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Payable</div>
-                  <div className="text-4xl font-black text-indigo-600">{currency.symbol}{(getTotal() - discount).toFixed(2)}</div>
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-6">
+                <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 text-center">
+                  <div className="text-[12px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Payable</div>
+                  <div className="text-5xl font-black text-indigo-700">{currency.symbol}{(getTotal() - discount).toFixed(2)}</div>
                 </div>
 
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
-                   <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Change to Return</div>
-                   <div className={`text-4xl font-black ${cashChange < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-center">
+                   <div className="text-[12px] font-black text-slate-500 uppercase tracking-widest mb-1">Change to Return</div>
+                   <div className={`text-5xl font-black ${cashChange < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
                       {currency.symbol}{Math.max(0, cashChange).toFixed(2)}
                    </div>
                 </div>
                 
-                <div className="flex gap-3 pt-2">
-                   <button onClick={() => setShowCashCalcModal(false)} className="flex-1 py-4 bg-slate-200 font-black rounded-lg hover:bg-slate-300 transition-colors uppercase tracking-widest text-[11px]">CANCEL</button>
+                <div className="flex gap-3 pt-4">
+                   <button onClick={() => setShowCashCalcModal(false)} className="flex-1 py-4 bg-slate-200 font-black rounded-lg hover:bg-slate-300 transition-colors uppercase tracking-widest text-[12px]">CANCEL</button>
                    <button 
                      disabled={cashChange < 0}
                      onClick={() => {
                        setShowCashCalcModal(false);
-                       handleCompleteSale('CASH', { receivedAmount: parsedReceived, changeAmount: Math.max(0, cashChange) });
+                       let finalMethod = 'CASH';
+                       if (parsedTng > 0 && parsedCash > 0) {
+                         finalMethod = `SPLIT|${parsedCash}|${parsedTng}`;
+                       } else if (parsedTng > 0) {
+                         finalMethod = 'TNG';
+                       }
+                       handleCompleteSale(finalMethod, { receivedAmount: totalReceived, changeAmount: Math.max(0, cashChange) });
                      }} 
-                     className="flex-1 py-4 bg-emerald-600 text-white font-black rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:grayscale transition-colors flex items-center justify-center gap-2 uppercase tracking-widest text-[11px]"
+                     className="flex-1 py-4 bg-emerald-600 text-white font-black rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:grayscale transition-colors flex items-center justify-center gap-2 uppercase tracking-widest text-[12px]"
                    >
-                     COMPLETE <Banknote size={16} />
+                     COMPLETE <Banknote size={18} />
                    </button>
                 </div>
               </div>
               
-              <div className="space-y-4">
-                <div className="relative">
+              <div className="space-y-6">
+                <div className="flex gap-4 mb-4">
+                    <button 
+                        onClick={() => setActivePaymentInput('CASH')}
+                        className={`flex-1 py-3 text-center border-2 rounded-lg font-black tracking-widest transition-colors ${activePaymentInput === 'CASH' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                    >
+                        CASH
+                    </button>
+                    <button 
+                        onClick={() => setActivePaymentInput('TNG')}
+                        className={`flex-1 py-3 text-center border-2 rounded-lg font-black tracking-widest transition-colors ${activePaymentInput === 'TNG' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                    >
+                        TNG
+                    </button>
+                </div>
+
+                <div className="relative mb-2">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-black text-slate-400">{currency.symbol}</span>
                   <input 
                     autoFocus
                     type="number" 
-                    value={cashAmountReceived} 
-                    onChange={e => setCashAmountReceived(e.target.value)} 
+                    value={activePaymentInput === 'CASH' ? cashAmountReceived : tngAmountReceived} 
+                    onChange={e => activePaymentInput === 'CASH' ? setCashAmountReceived(e.target.value) : setTngAmountReceived(e.target.value)} 
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && cashChange >= 0) {
-                        e.preventDefault();
-                        setShowCashCalcModal(false);
-                        handleCompleteSale('CASH', { receivedAmount: parsedReceived, changeAmount: Math.max(0, cashChange) });
+                         e.preventDefault();
+                         setShowCashCalcModal(false);
+                         let finalMethod = 'CASH';
+                         if (parsedTng > 0 && parsedCash > 0) {
+                           finalMethod = `SPLIT|${parsedCash}|${parsedTng}`;
+                         } else if (parsedTng > 0) {
+                           finalMethod = 'TNG';
+                         }
+                         handleCompleteSale(finalMethod, { receivedAmount: totalReceived, changeAmount: Math.max(0, cashChange) });
                       }
                     }}
-                    placeholder="Amount Received"
-                    className="w-full text-2xl font-black p-3 pl-12 border-2 border-slate-300 rounded-lg focus:border-indigo-500 outline-none transition-colors"
+                    placeholder={`Enter ${activePaymentInput} Amount`}
+                    className={`w-full text-3xl font-black p-4 pl-12 border-2 rounded-lg outline-none transition-colors ${activePaymentInput === 'CASH' ? 'border-emerald-300 focus:border-emerald-500' : 'border-blue-300 focus:border-blue-500'}`}
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-3">
                   {[1,2,3,4,5,6,7,8,9, '.', 0, 'C'].map((val) => (
                     <button
                       key={val}
                       onClick={() => {
                         if (val === 'C') {
-                          setCashAmountReceived('');
+                          if (activePaymentInput === 'CASH') setCashAmountReceived('');
+                          else setTngAmountReceived('');
                         } else {
-                          setCashAmountReceived(prev => prev + val.toString());
+                          if (activePaymentInput === 'CASH') setCashAmountReceived(prev => prev + val.toString());
+                          else setTngAmountReceived(prev => prev + val.toString());
                         }
                       }}
-                      className="py-3 bg-slate-100 font-black text-xl rounded border border-slate-200 hover:bg-slate-200 transition-colors"
+                      className="py-4 bg-slate-50 font-black text-2xl rounded-lg border-2 border-slate-200 hover:bg-slate-200 hover:border-slate-300 transition-colors shadow-sm"
                     >
                       {val}
                     </button>
                   ))}
+                </div>
+                
+                <div className="flex gap-4 text-[10px] font-black uppercase text-slate-400 tracking-widest justify-center">
+                    <div>Cash Inserted: <span className="text-emerald-600">{currency.symbol}{parsedCash.toFixed(2)}</span></div>
+                    <div>|</div>
+                    <div>TNG Pay: <span className="text-blue-600">{currency.symbol}{parsedTng.toFixed(2)}</span></div>
                 </div>
               </div>
             </div>
@@ -1140,6 +1219,7 @@ export default function POS() {
         isOpen={!!receiptData}
         onClose={() => setReceiptData(null)}
         title="Sale Receipt"
+        isSyncing={receiptData?.isPendingSync}
       >
         {receiptData && (
           <div className="max-w-md mx-auto p-4 flex flex-col font-mono text-sm border border-slate-200 rounded">
@@ -1150,7 +1230,9 @@ export default function POS() {
                 {storeProfile?.address && <p className="text-[10px] whitespace-pre-line">{storeProfile.address}</p>}
                 {storeProfile?.phone_number && <p className="text-[10px]">TEL: {storeProfile.phone_number}</p>}
                 <div className="mt-2 border-t border-dashed border-slate-300 pt-2">
-                  <p className="text-xs">Invoice #{receiptData.saleId}</p>
+                  <p className="text-xs font-bold font-mono uppercase tracking-wider">Invoice #{receiptData.saleId?.toString().startsWith('POS-') || receiptData.saleId?.toString().startsWith('INV-')
+                    ? receiptData.saleId 
+                    : `INV-${receiptData.saleId}`}</p>
                   <p className="text-xs">{receiptData.date}</p>
                 </div>
              </div>
@@ -1176,10 +1258,13 @@ export default function POS() {
                 {receiptData.discount > 0 && <p>DISCOUNT: -{currency.symbol}{receiptData.discount.toFixed(2)}</p>}
                 {receiptData.returnCredit > 0 && <p>RETURN CREDIT: -{currency.symbol}{receiptData.returnCredit.toFixed(2)}</p>}
                 <p className="font-bold text-lg border-t border-slate-300 pt-2">TOTAL: {currency.symbol}{(receiptData.total - receiptData.discount - receiptData.returnCredit).toFixed(2)}</p>
-                <p>METHOD: {receiptData.method}</p>
-                {receiptData.method === 'CASH' && (
+                <p>METHOD: {receiptData.method?.startsWith('SPLIT|') ? 'CASH & TNG' : (receiptData.method === 'ONLINE' ? 'TNG' : receiptData.method)}</p>
+                {(receiptData.method === 'CASH' || receiptData.method?.startsWith('SPLIT|')) && (
                   <>
                     <p>RECEIVED: {currency.symbol}{(receiptData.received || Math.max(0, receiptData.total - receiptData.discount - receiptData.returnCredit)).toFixed(2)}</p>
+                    {receiptData.method?.startsWith('SPLIT|') && (
+                       <p className="text-[10px] text-slate-500">CASH: {currency.symbol}{parseFloat(receiptData.method.split('|')[1]).toFixed(2)} | TNG: {currency.symbol}{parseFloat(receiptData.method.split('|')[2]).toFixed(2)}</p>
+                    )}
                     <p>CHANGE: {currency.symbol}{(receiptData.change || 0).toFixed(2)}</p>
                   </>
                 )}

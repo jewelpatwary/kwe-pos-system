@@ -254,6 +254,29 @@ async function writeProductModified(data: any) {
   await syncSettingOnline(SETTINGS_KEYS.PROD_MODIFIED, data);
 }
 
+async function readTimezone() {
+  return await getSettingOnline('timezone', 'Asia/Kuala_Lumpur');
+}
+
+function getLocalDateString(createdAtStr: string, timezone: string = 'Asia/Kuala_Lumpur') {
+  try {
+    const date = new Date(createdAtStr);
+    if (isNaN(date.getTime())) {
+      return createdAtStr.split('T')[0];
+    }
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return formatter.format(date);
+  } catch (err) {
+    return createdAtStr.split('T')[0];
+  }
+}
+
+
 
 // Middleware to verify JWT
 const authenticateToken = (req: any, res: any, next: any) => {
@@ -269,7 +292,6 @@ const authenticateToken = (req: any, res: any, next: any) => {
 
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
     if (err) {
-        console.log('JWT auth failed:', err.message);
         return res.status(401).json({ success: false, message: 'Unauthorized: ' + (err.message || 'JWT error') });
     }
     req.user = user;
@@ -283,6 +305,26 @@ const requireAdmin = (req: any, res: any, next: any) => {
     return res.status(403).json({ success: false, message: 'Forbidden: Admin access required' });
   }
   next();
+};
+
+const parseSplitPayment = (paymentMethod: string, totalAmount: number) => {
+  if (paymentMethod && paymentMethod.startsWith('SPLIT|')) {
+    const parts = paymentMethod.split('|');
+    return {
+      cash: parseFloat(parts[1]) || 0,
+      tng: parseFloat(parts[2]) || 0,
+      online: 0,
+      credit: 0,
+      autoBurn: 0
+    };
+  }
+  return {
+    cash: paymentMethod === 'CASH' ? totalAmount : 0,
+    tng: paymentMethod === 'TNG' ? totalAmount : 0,
+    online: (paymentMethod === 'ONLINE' || paymentMethod === 'TNG') ? totalAmount : 0,
+    credit: paymentMethod === 'CREDIT' ? totalAmount : 0,
+    autoBurn: paymentMethod === 'AUTO_BURN' ? totalAmount : 0
+  };
 };
 
 const app = express();
@@ -320,6 +362,11 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 // --- API ROUTES ---
+
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({ success: true, status: 'ok' });
+  });
 
   // Payment Types Endpoints
   app.get('/api/payment_types', async (req, res) => {
@@ -628,7 +675,7 @@ app.post('/api/auth/login', async (req, res) => {
           const token = jwt.sign(
             { id: 999999, username: 'admin', role: 'ADMIN' },
             JWT_SECRET,
-            { expiresIn: '12h' }
+            { expiresIn: '7d' }
           );
           return res.json({
             success: true,
@@ -665,7 +712,7 @@ app.post('/api/auth/login', async (req, res) => {
             const token = jwt.sign(
               { id: 999999, username: 'admin', role: 'ADMIN' },
               JWT_SECRET,
-              { expiresIn: '12h' }
+              { expiresIn: '7d' }
             );
             return res.json({
               success: true,
@@ -693,7 +740,7 @@ app.post('/api/auth/login', async (req, res) => {
         const token = jwt.sign(
           { id: user.id, username: user.username, role: user.role },
           JWT_SECRET,
-          { expiresIn: '12h' }
+          { expiresIn: '7d' }
         );
 
         // Attempt logging without crashing if the logs table fails
@@ -720,7 +767,7 @@ app.post('/api/auth/login', async (req, res) => {
           const token = jwt.sign(
             { id: 999999, username: 'admin', role: 'ADMIN' },
             JWT_SECRET,
-            { expiresIn: '12h' }
+            { expiresIn: '7d' }
           );
           return res.json({
             success: true,
@@ -3002,10 +3049,18 @@ app.post('/api/auth/login', async (req, res) => {
             .gte('created_at', start)
             .lte('created_at', end);
 
-          const realSales = (yesterdaySales || []).filter(s => ['CASH', 'CREDIT'].includes(s.payment_method)).reduce((sum, s) => sum + s.total_amount, 0);
-          const creditSales = (yesterdaySales || []).filter(s => s.payment_method === 'CREDIT').reduce((sum, s) => sum + s.total_amount, 0);
-          const autoBurnSales = (yesterdaySales || []).filter(s => s.payment_method === 'AUTO_BURN').reduce((sum, s) => sum + s.total_amount, 0);
-          const onlineSales = (yesterdaySales || []).filter(s => s.payment_method === 'ONLINE' || s.payment_method === 'TNG').reduce((sum, s) => sum + s.total_amount, 0);
+          let realSales = 0;
+          let creditSales = 0;
+          let autoBurnSales = 0;
+          let onlineSales = 0;
+
+          (yesterdaySales || []).forEach(s => {
+             const parsed = parseSplitPayment(s.payment_method, s.total_amount);
+             realSales += parsed.cash + parsed.credit;
+             creditSales += parsed.credit;
+             autoBurnSales += parsed.autoBurn;
+             onlineSales += parsed.online;
+          });
 
           await supabase.from('sales_summary_logs').upsert([{
             date: yesterday,
@@ -3255,11 +3310,12 @@ app.post('/api/auth/login', async (req, res) => {
       };
 
       (summaryData || []).forEach((s: any) => {
-        if (s.payment_method === 'CREDIT') summary.totalCredit += s.total_amount;
-        else if (s.payment_method === 'CASH') summary.totalCash += s.total_amount;
-        else if (s.payment_method === 'TNG') summary.totalTNG += s.total_amount;
-        else if (s.payment_method === 'ONLINE') summary.totalOnline += s.total_amount;
-        else if (s.payment_method === 'AUTO_BURN') summary.totalAutoBurn += s.total_amount;
+         const parsed = parseSplitPayment(s.payment_method, s.total_amount);
+         summary.totalCredit += parsed.credit;
+         summary.totalCash += parsed.cash;
+         summary.totalTNG += parsed.tng;
+         summary.totalOnline += parsed.online - parsed.tng; // online total includes tng in parsing, so subtract exactly tng
+         summary.totalAutoBurn += parsed.autoBurn;
       });
 
       summary.grandTotal = summary.totalCredit + summary.totalCash + summary.totalOnline + summary.totalTNG + summary.totalAutoBurn;
@@ -3446,14 +3502,39 @@ app.post('/api/auth/login', async (req, res) => {
     }
   });
 
+  // Get next available sale ID
+  app.get('/api/sales/next-id', authenticateToken, async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('sales')
+        .select('id')
+        .order('id', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      const latestId = data && data.length > 0 ? data[0].id : 0;
+      res.json({ success: true, next_id: latestId + 1 });
+    } catch (error: any) {
+      console.error('Supabase next sale ID fetch error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Get sale by ID
   app.get('/api/sales/:id', async (req, res) => {
     const { id } = req.params;
+    let cleanId: any = id;
+    if (typeof id === 'string') {
+      const match = id.match(/\d+$/);
+      if (match) {
+        cleanId = parseInt(match[0], 10);
+      }
+    }
     try {
       const { data: sale, error: saleError } = await supabase
         .from('sales')
-        .select('*')
-        .eq('id', id)
+        .select('*, customers(name)')
+        .eq('id', cleanId)
         .single();
 
       if (saleError || !sale) {
@@ -3463,7 +3544,7 @@ app.post('/api/auth/login', async (req, res) => {
       const { data: items, error: itemsError } = await supabase
         .from('sale_items')
         .select('*, products(name, barcode)')
-        .eq('sale_id', id);
+        .eq('sale_id', cleanId);
 
       if (itemsError) throw itemsError;
 
@@ -3495,6 +3576,282 @@ app.post('/api/auth/login', async (req, res) => {
     }
   });
 
+  // Update sale invoice (Admin only)
+  app.put('/api/sales/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    let cleanId: any = id;
+    if (typeof id === 'string') {
+      const match = id.match(/\d+$/);
+      if (match) {
+        cleanId = parseInt(match[0], 10);
+      }
+    }
+    const { payment_method, customer_id, discount_amount, created_at, total_amount, items } = req.body;
+    try {
+      // 1. Get the old sale details
+      const { data: oldSale, error: oldSaleError } = await supabase
+        .from('sales')
+        .select('*')
+        .eq('id', cleanId)
+        .single();
+        
+      if (oldSaleError || !oldSale) {
+        return res.status(404).json({ success: false, message: 'Sale not found' });
+      }
+
+      // 2. Reverse old credit if applicable
+      if (oldSale.payment_method === 'CREDIT' && oldSale.customer_id) {
+        const { data: oldCustomer } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', oldSale.customer_id)
+          .single();
+          
+        if (oldCustomer) {
+          await supabase
+            .from('customers')
+            .update({
+              daily_used: Math.max(0, (oldCustomer.daily_used || 0) - oldSale.total_amount),
+              monthly_used: Math.max(0, (oldCustomer.monthly_used || 0) - oldSale.total_amount),
+              current_balance: Math.max(0, (oldCustomer.current_balance || 0) - oldSale.total_amount)
+            })
+            .eq('id', oldSale.customer_id);
+            
+          // Delete old credit logs that match this charge
+          await supabase
+            .from('credit_logs')
+            .delete()
+            .eq('customer_id', oldSale.customer_id)
+            .eq('amount', oldSale.total_amount)
+            .eq('type', 'CHARGE')
+            .like('notes', '%Credit Sale%');
+        }
+      }
+
+      // Determine final total amount
+      let finalTotal = total_amount !== undefined ? total_amount : oldSale.total_amount;
+      
+      if (items && Array.isArray(items)) {
+         let newSubtotal = 0;
+         for (const item of items) {
+            newSubtotal += Number(item.unit_price) * Number(item.quantity);
+         }
+         finalTotal = Math.max(0, newSubtotal - (discount_amount !== undefined ? discount_amount : oldSale.discount_amount));
+         
+         // Revert old items stock
+         const { data: oldItems } = await supabase.from('sale_items').select('*').eq('sale_id', id);
+         if (oldItems && oldItems.length > 0) {
+            for (const oldItem of oldItems) {
+               const { data: currentProd } = await supabase.from('products').select('stock_quantity').eq('id', oldItem.product_id).single();
+               if (currentProd) {
+                  await supabase.from('products').update({ stock_quantity: (currentProd.stock_quantity || 0) + oldItem.quantity }).eq('id', oldItem.product_id);
+               }
+            }
+            await supabase.from('sale_items').delete().eq('sale_id', id);
+         }
+         
+         // Apply new items stock
+         for (const item of items) {
+             const productId = item.id || item.product_id;
+             const qty = Number(item.cart_quantity || item.quantity);
+             const price = Number(item.selling_price || item.unit_price);
+             const subtotal = price * qty;
+             
+             await supabase.from('sale_items').insert([{ sale_id: id, product_id: productId, quantity: qty, unit_price: price, subtotal }]);
+             
+             const { data: currentProd } = await supabase.from('products').select('stock_quantity').eq('id', productId).single();
+             if (currentProd) {
+                 await supabase.from('products').update({ stock_quantity: (currentProd.stock_quantity || 0) - qty }).eq('id', productId);
+             }
+         }
+      } else if (discount_amount !== undefined && total_amount === undefined) {
+         // Re-calculate total amount based on the subtotal and new discount if provided
+         const subtotal = oldSale.total_amount + oldSale.discount_amount;
+         finalTotal = Math.max(0, subtotal - (discount_amount || 0));
+      }
+
+      // 3. Apply new credit if applicable
+      if (payment_method === 'CREDIT') {
+        const targetCustomerId = customer_id || oldSale.customer_id;
+        if (!targetCustomerId) {
+          throw new Error('Customer ID required for credit sale');
+        }
+        
+        const { data: newCustomer, error: custErr } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', targetCustomerId)
+          .single();
+          
+        if (custErr || !newCustomer) {
+          throw new Error('Customer not found');
+        }
+        
+        if (newCustomer.credit_status !== 'ACTIVE') {
+          throw new Error(`Credit account of customer is ${newCustomer.credit_status}`);
+        }
+
+        const dailyRemaining = newCustomer.daily_limit - (newCustomer.daily_used || 0);
+        const monthlyRemaining = newCustomer.monthly_limit - (newCustomer.monthly_used || 0);
+
+        if (dailyRemaining < finalTotal) {
+          throw new Error('Daily credit limit exceeded for this customer');
+        }
+        if (monthlyRemaining < finalTotal) {
+          throw new Error('Monthly credit limit exceeded for this customer');
+        }
+
+        // Update new customer usage
+        await supabase
+          .from('customers')
+          .update({
+            daily_used: (newCustomer.daily_used || 0) + finalTotal,
+            monthly_used: (newCustomer.monthly_used || 0) + finalTotal,
+            current_balance: (newCustomer.current_balance || 0) + finalTotal
+          })
+          .eq('id', targetCustomerId);
+
+        // Insert new credit log
+        await supabase
+          .from('credit_logs')
+          .insert([{
+            customer_id: targetCustomerId,
+            amount: finalTotal,
+            type: 'CHARGE',
+            notes: `POS Credit Sale (Updated INV-${id})`,
+            created_at: created_at || oldSale.created_at
+          }]);
+      }
+
+      // 4. Update the Sale record
+      const updateData: any = {};
+      if (payment_method !== undefined) updateData.payment_method = payment_method;
+      if (customer_id !== undefined) updateData.customer_id = customer_id || null;
+      if (discount_amount !== undefined) updateData.discount_amount = discount_amount;
+      if (created_at !== undefined) updateData.created_at = created_at;
+      updateData.total_amount = finalTotal;
+
+      const { data: updatedSale, error: updateError } = await supabase
+        .from('sales')
+        .update(updateData)
+        .eq('id', cleanId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      console.log(`[SALES] Sale ID ${id} updated by admin. New payment method: ${payment_method}`);
+
+      res.json({ success: true, data: updatedSale });
+    } catch (error: any) {
+      console.error('Supabase update sale error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+
+  app.delete('/api/sales/:id', authenticateToken, requireAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    let cleanId: any = id;
+    if (typeof id === 'string') {
+      const match = id.match(/\d+$/);
+      if (match) {
+        cleanId = parseInt(match[0], 10);
+      }
+    }
+    try {
+      // 1. Get the sale
+      const { data: sale, error: saleError } = await supabase
+        .from('sales')
+        .select('*')
+        .eq('id', cleanId)
+        .single();
+        
+      if (saleError || !sale) {
+        return res.status(404).json({ success: false, message: 'Sale not found' });
+      }
+
+      // 2. Reverse credit if applicable
+      if (sale.payment_method === 'CREDIT' && sale.customer_id) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', sale.customer_id)
+          .single();
+          
+        if (customer) {
+          await supabase
+            .from('customers')
+            .update({
+              daily_used: Math.max(0, (customer.daily_used || 0) - sale.total_amount),
+              monthly_used: Math.max(0, (customer.monthly_used || 0) - sale.total_amount),
+              current_balance: Math.max(0, (customer.current_balance || 0) - sale.total_amount)
+            })
+            .eq('id', sale.customer_id);
+            
+          // Delete credit logs that match this charge
+          await supabase
+            .from('credit_logs')
+            .delete()
+            .eq('customer_id', sale.customer_id)
+            .eq('amount', sale.total_amount)
+            .eq('type', 'CHARGE')
+            .like('notes', '%Credit Sale%');
+        }
+      }
+
+      // 3. Get sale items to restore stock
+      const { data: items } = await supabase
+        .from('sale_items')
+        .select('*')
+        .eq('sale_id', cleanId);
+
+      if (items && items.length > 0) {
+        for (const item of items) {
+          // Increase stock back
+          const { data: product } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
+          if (product) {
+            await supabase.from('products').update({ stock_quantity: (product.stock_quantity || 0) + item.quantity }).eq('id', item.product_id);
+            
+            // Log movement
+            await supabase
+              .from('stock_movements')
+              .insert([{ product_id: item.product_id, quantity: item.quantity, type: 'IN', reference_type: 'SALE_DELETE', reference_id: cleanId }]);
+          }
+        }
+        
+        // Delete sale items just in case there's no cascade
+        await supabase.from('sale_items').delete().eq('sale_id', cleanId);
+      }
+
+      // Insert into void_logs
+      await supabase
+        .from('void_logs')
+        .insert([{
+            invoice_number: `INV-${cleanId}`,
+            items: items || [],
+            total_amount: sale.total_amount,
+            reason: 'Invoice deleted by Admin',
+            void_by: req.user?.id || null
+        }]);
+
+      // 4. Delete the Sale record
+      const { error: deleteError } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', cleanId);
+
+      if (deleteError) {
+        console.error('Supabase delete sale error detailed:', deleteError);
+        throw deleteError;
+      }
+
+      res.json({ success: true, message: 'Sale deleted successfully' });
+    } catch (error: any) {
+      console.error('Supabase delete sale catch error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
 
   // Create Customer Return
   app.post('/api/sales-returns', async (req, res) => {
@@ -3806,6 +4163,7 @@ app.post('/api/auth/login', async (req, res) => {
       const { start_date, end_date, category_id } = req.query;
       const startDate = start_date ? `${start_date}T00:00:00` : null;
       const endDate = end_date ? `${end_date}T23:59:59` : null;
+      const tz = await readTimezone();
 
       // 1. Fetch Sales and Returns for the period
       let salesQuery = supabase.from('sale_items').select(`
@@ -3844,18 +4202,36 @@ app.post('/api/auth/login', async (req, res) => {
       // 2. Process Stats
       const statsMap: any = {};
       const categoryMap: any = {};
+      const categoryDateMap: any = {};
       const itemMap: any = {};
 
       (sales || []).forEach((item: any) => {
-        const method = item.sales.payment_method;
-        statsMap[method] = statsMap[method] || { total: 0, count: 0 }; // count is simplified here
-        statsMap[method].total += item.subtotal;
+        const parsed = parseSplitPayment(item.sales.payment_method, item.subtotal);
+        ['CASH', 'TNG', 'ONLINE', 'CREDIT', 'AUTO_BURN'].forEach(key => {
+          const val = parsed[key.toLowerCase() as keyof typeof parsed];
+          if (val && val > 0) {
+            statsMap[key] = statsMap[key] || { total: 0, count: 0 };
+            statsMap[key].total += val;
+          }
+        });
         
         const catName = item.products?.categories?.name || 'Uncategorized';
         categoryMap[catName] = categoryMap[catName] || { total_qty: 0, total_value: 0, payments: {} };
         categoryMap[catName].total_qty += item.quantity;
         categoryMap[catName].total_value += item.subtotal;
-        categoryMap[catName].payments[method] = (categoryMap[catName].payments[method] || 0) + item.subtotal;
+
+        const dateStr = item.sales?.created_at ? getLocalDateString(item.sales.created_at, tz) : 'Unknown';
+        const dateCatKey = `${dateStr}_${catName}`;
+        categoryDateMap[dateCatKey] = categoryDateMap[dateCatKey] || { date: dateStr, category_name: catName, total_qty: 0, total_value: 0 };
+        categoryDateMap[dateCatKey].total_qty += item.quantity;
+        categoryDateMap[dateCatKey].total_value += item.subtotal;
+
+        ['CASH', 'TNG', 'ONLINE', 'CREDIT', 'AUTO_BURN'].forEach(key => {
+           const val = parsed[key.toLowerCase() as keyof typeof parsed];
+           if (val && val > 0) {
+             categoryMap[catName].payments[key] = (categoryMap[catName].payments[key] || 0) + val;
+           }
+        });
 
         const pName = item.products?.name;
         itemMap[pName] = itemMap[pName] || { product_name: pName, category_name: catName, total_qty: 0, total_value: 0 };
@@ -3875,6 +4251,12 @@ app.post('/api/auth/login', async (req, res) => {
         categoryMap[catName].total_value += value;
         categoryMap[catName].payments[method] = (categoryMap[catName].payments[method] || 0) + value;
 
+        const dateStr = item.sales_returns?.created_at ? getLocalDateString(item.sales_returns.created_at, tz) : 'Unknown';
+        const dateCatKey = `${dateStr}_${catName}`;
+        categoryDateMap[dateCatKey] = categoryDateMap[dateCatKey] || { date: dateStr, category_name: catName, total_qty: 0, total_value: 0 };
+        categoryDateMap[dateCatKey].total_qty -= item.quantity;
+        categoryDateMap[dateCatKey].total_value += value;
+
         const pName = item.products?.name;
         itemMap[pName] = itemMap[pName] || { product_name: pName, category_name: catName, total_qty: 0, total_value: 0 };
         itemMap[pName].total_qty -= item.quantity;
@@ -3883,6 +4265,10 @@ app.post('/api/auth/login', async (req, res) => {
 
       const stats = Object.entries(statsMap).map(([payment_method, data]: [any, any]) => ({ payment_method, ...data }));
       const categoryBreakdown = Object.entries(categoryMap).map(([category_name, data]: [any, any]) => ({ category_name, ...data }));
+      const categoryBreakdownByDate = Object.values(categoryDateMap).sort((a: any, b: any) => {
+        if (b.date !== a.date) return b.date.localeCompare(a.date);
+        return a.category_name.localeCompare(b.category_name);
+      });
       const itemDetails = Object.values(itemMap).sort((a: any, b: any) => b.total_value - a.total_value).slice(0, 50);
 
       // Build daily category pivot summary
@@ -3891,7 +4277,7 @@ app.post('/api/auth/login', async (req, res) => {
 
       (sales || []).forEach((item: any) => {
         if (!item.sales || !item.sales.created_at) return;
-        const dateStr = item.sales.created_at.split('T')[0];
+        const dateStr = getLocalDateString(item.sales.created_at, tz);
         const catName = item.products?.categories?.name || 'Uncategorized';
         allCategoriesSet.add(catName);
 
@@ -3907,17 +4293,14 @@ app.post('/api/auth/login', async (req, res) => {
         }
         dailyPivotMap[dateStr].categories[catName] = (dailyPivotMap[dateStr].categories[catName] || 0) + item.subtotal;
 
-        const method = item.sales.payment_method;
-        if (method === 'CASH') {
-          dailyPivotMap[dateStr].cash = (dailyPivotMap[dateStr].cash || 0) + item.subtotal;
-        } else if (method === 'TNG' || method === 'ONLINE') {
-          dailyPivotMap[dateStr].tng = (dailyPivotMap[dateStr].tng || 0) + item.subtotal;
-        }
+        const parsed = parseSplitPayment(item.sales.payment_method, item.subtotal);
+        dailyPivotMap[dateStr].cash = (dailyPivotMap[dateStr].cash || 0) + parsed.cash;
+        dailyPivotMap[dateStr].tng = (dailyPivotMap[dateStr].tng || 0) + parsed.tng + (parsed.online - parsed.tng);
       });
 
       (returns || []).forEach((item: any) => {
         if (!item.sales_returns || !item.sales_returns.created_at) return;
-        const dateStr = item.sales_returns.created_at.split('T')[0];
+        const dateStr = getLocalDateString(item.sales_returns.created_at, tz);
         const catName = item.products?.categories?.name || 'Uncategorized';
         allCategoriesSet.add(catName);
 
@@ -3969,7 +4352,7 @@ app.post('/api/auth/login', async (req, res) => {
         grandTotal: stats.reduce((acc, s) => acc + s.total, 0)
       };
 
-      res.json({ success: true, data: stats, summary, categoryBreakdown, itemDetails, dailyPivot: { categories: uniqueCategories, rows: dailyPivotRows } });
+      res.json({ success: true, data: stats, summary, categoryBreakdown, categoryBreakdownByDate, itemDetails, dailyPivot: { categories: uniqueCategories, rows: dailyPivotRows } });
     } catch (error: any) {
       console.error('Supabase detailed sales report error:', error);
       res.status(500).json({ success: false, message: error.message });
@@ -3987,7 +4370,7 @@ app.post('/api/auth/login', async (req, res) => {
           quantity,
           subtotal,
           unit_price,
-          sales!inner(created_at, status, payment_method),
+          sales!inner(created_at, status, payment_method, total_amount, discount_amount),
           products!inner(name, category_id, categories(name))
         `).eq('sales.status', 'completed');
       
@@ -4021,16 +4404,27 @@ app.post('/api/auth/login', async (req, res) => {
       const summary = { grand_total: 0, total_cash: 0, total_online: 0, total_credit: 0, total_auto_burn: 0 };
 
       (sales || []).forEach((item: any) => {
+        const sale = item.sales;
+        const discount = Number(sale.discount_amount) || 0;
+        const total = Number(sale.total_amount) || 0;
+        const totalBeforeDiscount = total + discount;
+
+        let proratedSubtotal = Number(item.subtotal);
+        if (totalBeforeDiscount > 0) {
+          proratedSubtotal = proratedSubtotal - (proratedSubtotal * (discount / totalBeforeDiscount));
+        }
+
+        const parsed = parseSplitPayment(item.sales.payment_method, proratedSubtotal);
         const row = {
           timestamp: item.sales.created_at,
           category_name: item.products?.categories?.name || 'Uncategorized',
           product_name: item.products?.name,
           qty_sold: item.quantity,
-          cash_amount: item.sales.payment_method === 'CASH' ? item.subtotal : 0,
-          online_amount: (item.sales.payment_method === 'ONLINE' || item.sales.payment_method === 'TNG') ? item.subtotal : 0,
-          credit_amount: item.sales.payment_method === 'CREDIT' ? item.subtotal : 0,
-          auto_burn_amount: item.sales.payment_method === 'AUTO_BURN' ? item.subtotal : 0,
-          total_amount: item.subtotal
+          cash_amount: parsed.cash,
+          online_amount: parsed.online,
+          credit_amount: parsed.credit,
+          auto_burn_amount: parsed.autoBurn,
+          total_amount: proratedSubtotal
         };
         rows.push(row);
         summary.grand_total += row.total_amount;
@@ -4150,7 +4544,7 @@ app.post('/api/auth/login', async (req, res) => {
           subtotal,
           quantity,
           products!inner(purchase_price),
-          sales!inner(created_at, status, payment_method)
+          sales!inner(created_at, status, payment_method, discount_amount, total_amount)
         `)
         .eq('sales.status', 'completed')
         .neq('sales.payment_method', 'AUTO_BURN')
@@ -4176,11 +4570,32 @@ app.post('/api/auth/login', async (req, res) => {
         todayExpenses: (expenses || []).reduce((sum, e) => sum + e.amount, 0)
       };
 
-      (sales || []).forEach(s => {
-        if (['CASH', 'CREDIT', 'ONLINE', 'TNG'].includes(s.payment_method)) summary.todayReal += s.total_amount;
-        if (s.payment_method === 'CREDIT') summary.todayCredit += s.total_amount;
-        if (s.payment_method === 'AUTO_BURN') summary.todayAutoBurn += s.total_amount;
-        if (s.payment_method === 'ONLINE' || s.payment_method === 'TNG') summary.todayOnline += s.total_amount;
+      // Aggregate payments using line items for accurate prorated calculations
+      const salesMap: any = {};
+      (profitData || []).forEach((item: any) => {
+        const saleId = item.sales.id;
+        if (!salesMap[saleId]) {
+          salesMap[saleId] = {
+            payment_method: item.sales.payment_method,
+            discount: Number(item.sales.discount_amount) || 0,
+            originalTotal: Number(item.sales.total_amount) + (Number(item.sales.discount_amount) || 0),
+            subtotal: 0
+          };
+        }
+        salesMap[saleId].subtotal += Number(item.subtotal);
+      });
+
+      Object.values(salesMap).forEach((s: any) => {
+        let proratedTotal = s.subtotal;
+        if (s.originalTotal > 0) {
+           proratedTotal -= (s.subtotal * (s.discount / s.originalTotal));
+        }
+
+        const parsed = parseSplitPayment(s.payment_method, proratedTotal);
+        summary.todayReal += parsed.cash + parsed.credit + parsed.online;
+        summary.todayCredit += parsed.credit;
+        summary.todayAutoBurn += parsed.autoBurn;
+        summary.todayOnline += parsed.online;
       });
 
       summary.todayProfit = (profitData || []).reduce((sum, item: any) => {
@@ -5168,6 +5583,7 @@ app.post('/api/auth/login', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid month format. Expected YYYY-MM.' });
       }
 
+      const tz = await readTimezone();
       const parts = month.split('-');
       const year = parseInt(parts[0], 10);
       const monthNum = parseInt(parts[1], 10);
@@ -5179,9 +5595,10 @@ app.post('/api/auth/login', async (req, res) => {
       const { data: salesRaw, error: sErr } = await supabase
         .from('sale_items')
         .select(`
+          product_id,
           subtotal,
-          sales!inner(created_at, status),
-          products!inner(category_id, categories(name))
+          sales!inner(id, created_at, status, total_amount, discount_amount),
+          products!inner(id)
         `)
         .eq('sales.status', 'completed')
         .gte('sales.created_at', monthStart)
@@ -5189,14 +5606,42 @@ app.post('/api/auth/login', async (req, res) => {
 
       if (sErr) throw sErr;
 
+      const cats2 = await readCategories2();
+      const mappings = await readProductCategory2();
+
+      // Group by sale ID to find the sum of item subtotals for each sale
+      const saleSubtotalSums = new Map<string, number>();
+      (salesRaw || []).forEach((si: any) => {
+        const saleId = si.sales.id?.toString();
+        if (saleId) {
+          const currentSum = saleSubtotalSums.get(saleId) || 0;
+          saleSubtotalSums.set(saleId, currentSum + (si.subtotal || 0));
+        }
+      });
+
       const salesByCategory: any[] = [];
       const salesMap = new Map();
       (salesRaw || []).forEach((si: any) => {
-        const date = si.sales.created_at.split('T')[0];
-        const category = (si.products?.categories?.name || 'OTHER').toUpperCase();
+        const date = getLocalDateString(si.sales.created_at, tz);
+        const prodId = si.product_id;
+        const cat2Id = mappings[prodId?.toString()] || null;
+        const cat2Obj = cat2Id ? cats2.find((c: any) => c.id?.toString() === cat2Id.toString()) : null;
+        const category = (cat2Obj?.name || 'OTHER').toUpperCase();
         const key = `${date}_${category}`;
+
+        // Prorate item subtotal based on actual total amount of relevant sale to account for transaction-level discounts
+        const saleId = si.sales.id?.toString();
+        const itemSubtotal = si.subtotal || 0;
+        const totalItemsSubtotal = saleId ? (saleSubtotalSums.get(saleId) || 0) : 0;
+        let proratedSubtotal = itemSubtotal;
+        
+        if (totalItemsSubtotal > 0) {
+          const actualTotalAmount = si.sales.total_amount !== undefined && si.sales.total_amount !== null ? Number(si.sales.total_amount) : itemSubtotal;
+          proratedSubtotal = itemSubtotal * (actualTotalAmount / totalItemsSubtotal);
+        }
+
         const current = salesMap.get(key) || 0;
-        salesMap.set(key, current + si.subtotal);
+        salesMap.set(key, current + proratedSubtotal);
       });
       salesMap.forEach((total, key) => {
         const [date, category] = key.split('_');
@@ -5207,10 +5652,11 @@ app.post('/api/auth/login', async (req, res) => {
       const { data: returnsRaw, error: rErr } = await supabase
         .from('sales_return_items')
         .select(`
+          product_id,
           quantity,
           refund_amount,
           sales_returns!inner(created_at),
-          products!inner(category_id, categories(name))
+          products!inner(id)
         `)
         .gte('sales_returns.created_at', monthStart)
         .lte('sales_returns.created_at', monthEnd);
@@ -5220,8 +5666,11 @@ app.post('/api/auth/login', async (req, res) => {
       const returnsByCategory: any[] = [];
       const returnsMap = new Map();
       (returnsRaw || []).forEach((sri: any) => {
-        const date = sri.sales_returns.created_at.split('T')[0];
-        const category = (sri.products?.categories?.name || 'OTHER').toUpperCase();
+        const date = getLocalDateString(sri.sales_returns.created_at, tz);
+        const prodId = sri.product_id;
+        const cat2Id = mappings[prodId?.toString()] || null;
+        const cat2Obj = cat2Id ? cats2.find((c: any) => c.id?.toString() === cat2Id.toString()) : null;
+        const category = (cat2Obj?.name || 'OTHER').toUpperCase();
         const key = `${date}_${category}`;
         const current = returnsMap.get(key) || 0;
         returnsMap.set(key, current + (sri.quantity * sri.refund_amount));
@@ -5231,7 +5680,7 @@ app.post('/api/auth/login', async (req, res) => {
         returnsByCategory.push({ date, category, total });
       });
 
-      // 3. Total Cash/Credit Sales by Date
+      // 3. Total Cash/Credit Sales by Date (using direct sales table for total amount)
       const { data: salesPaymentRaw, error: spErr } = await supabase
         .from('sales')
         .select('created_at, total_amount, payment_method, customer_id, status')
@@ -5241,14 +5690,35 @@ app.post('/api/auth/login', async (req, res) => {
 
       if (spErr) throw spErr;
 
+      // ALSO calculate the daily total directly
+      const dailyTotalSales = new Map<string, number>();
+      (salesPaymentRaw || []).forEach((s: any) => {
+        const date = getLocalDateString(s.created_at, tz);
+        dailyTotalSales.set(date, (dailyTotalSales.get(date) || 0) + (Number(s.total_amount) || 0));
+      });
+
       const salesByPaymentMethod: any[] = [];
       const paymentMap = new Map();
       (salesPaymentRaw || []).forEach((s: any) => {
-        const date = s.created_at.split('T')[0];
-        const method = (s.customer_id || s.payment_method === 'AUTO_BURN') ? 'CREDIT' : s.payment_method;
-        const key = `${date}_${method}`;
-        const current = paymentMap.get(key) || 0;
-        paymentMap.set(key, current + s.total_amount);
+        const date = getLocalDateString(s.created_at, tz);
+        if (s.payment_method && s.payment_method.startsWith('SPLIT|')) {
+          const parsed = parseSplitPayment(s.payment_method, s.total_amount);
+          if (parsed.cash > 0) {
+            const key = `${date}_CASH`;
+            const current = paymentMap.get(key) || 0;
+            paymentMap.set(key, current + parsed.cash);
+          }
+          if (parsed.tng > 0) {
+            const key = `${date}_TNG`;
+            const current = paymentMap.get(key) || 0;
+            paymentMap.set(key, current + parsed.tng);
+          }
+        } else {
+          const method = (s.customer_id || s.payment_method === 'AUTO_BURN') ? 'CREDIT' : s.payment_method;
+          const key = `${date}_${method}`;
+          const current = paymentMap.get(key) || 0;
+          paymentMap.set(key, current + (Number(s.total_amount) || 0));
+        }
       });
       paymentMap.forEach((total, key) => {
         const [date, payment_method] = key.split('_');
@@ -5262,17 +5732,23 @@ app.post('/api/auth/login', async (req, res) => {
           created_at,
           total_refund,
           refund_type,
-          sales!inner(customer_id)
+          sales(customer_id)
         `)
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd);
 
       if (rpErr) throw rpErr;
 
+      // Subtract returns
+      (returnsPaymentRaw || []).forEach((sr: any) => {
+        const date = getLocalDateString(sr.created_at, tz);
+        dailyTotalSales.set(date, (dailyTotalSales.get(date) || 0) - (Number(sr.total_refund) || 0));
+      });
+
       const returnsByPaymentMethod: any[] = [];
       const retPaymentMap = new Map();
       (returnsPaymentRaw || []).forEach((sr: any) => {
-        const date = sr.created_at.split('T')[0];
+        const date = getLocalDateString(sr.created_at, tz);
         const method = (sr.sales?.customer_id || sr.refund_type === 'AUTO_BURN') ? 'CREDIT' : sr.refund_type;
         const key = `${date}_${method}`;
         const current = retPaymentMap.get(key) || 0;
@@ -5287,39 +5763,63 @@ app.post('/api/auth/login', async (req, res) => {
       const { data: purchasesRaw, error: purErr } = await supabase
         .from('purchase_invoice_items')
         .select(`
+          product_id,
           total_price,
           purchase_invoices!inner(id, date, payment_status, status),
-          products!inner(id, category_id, categories(name))
+          products!inner(id)
         `)
         .eq('purchase_invoices.status', 'ACTIVE')
         .ilike('purchase_invoices.date', `${month}%`);
 
       if (purErr) throw purErr;
 
+      const piExt = await readPIExt();
+      const pmTypes = await readPaymentTypes();
+
       const purchases: any[] = [];
       const purchaseMap = new Map();
       (purchasesRaw || []).forEach((pii: any) => {
         const date = pii.purchase_invoices.date;
-        
-        // Group ONLY by Primary Main Category as requested
-        const categoryName = pii.products?.categories?.name || 'OTHER';
+        const prodId = pii.product_id;
+        const cat2Id = mappings[prodId?.toString()] || null;
+        const cat2Obj = cat2Id ? cats2.find((c: any) => c.id?.toString() === cat2Id.toString()) : null;
+        const categoryName = cat2Obj ? cat2Obj.name : 'OTHER';
 
         const category = categoryName.toUpperCase();
         const status = pii.purchase_invoices.payment_status;
-        const key = `${date}###${category}###${status}`;
+
+        // Resolve payment method name
+        const ext = piExt[pii.purchase_invoices.id?.toString()] || {};
+        let payment_method = 'CREDIT';
+        const pTypeIdStr = ext.payment_type_id?.toString();
+        const pTypeObj = pmTypes.find((t: any) => t.id?.toString() === pTypeIdStr);
+        const pNameLower = (pTypeObj?.name || ext.payment_type || '').toLowerCase();
+
+        if (pTypeIdStr === '1' || pNameLower.includes('cash') || pii.purchase_invoices.payment_status === 'PAID') {
+          if (pNameLower.includes('tng') || pNameLower.includes('touch') || pNameLower.includes('boost') || pNameLower.includes('online')) {
+            payment_method = 'TNG';
+          } else {
+            payment_method = 'CASH';
+          }
+        } else if (pNameLower.includes('credit') || pNameLower.includes('due') || pNameLower.includes('unpaid') || pii.purchase_invoices.payment_status === 'DUE') {
+          payment_method = 'CREDIT';
+        } else if (pNameLower.includes('tng') || pNameLower.includes('online') || pNameLower.includes('bank') || pNameLower.includes('qr')) {
+          payment_method = 'TNG';
+        } else {
+          payment_method = pii.purchase_invoices.payment_status === 'PAID' ? 'CASH' : 'CREDIT';
+        }
+
+        const key = `${date}###${category}###${status}###${payment_method}`;
         const current = purchaseMap.get(key) || 0;
         purchaseMap.set(key, current + pii.total_price);
       });
       purchaseMap.forEach((total, key) => {
-        const [date, category, payment_status] = key.split('###');
-        purchases.push({ date, category, payment_status, total });
+        const [date, category, payment_status, payment_method] = key.split('###');
+        purchases.push({ date, category, payment_status, payment_method, total });
       });
 
-      // 6. All Categories (Use only main categories from DB)
-      const { data: categoriesData, error: catErr } = await supabase.from('categories').select('name').eq('status', 'active');
-      if (catErr) throw catErr;
-
-      const categories = (categoriesData || []).map(c => ({ name: (c.name || '').toUpperCase() }));
+      // 6. All Categories (Use Category 2)
+      const categories = (cats2 || []).filter((c: any) => c.status === 'active').map((c: any) => ({ name: (c.name || '').toUpperCase() }));
 
       // 7. Expenses
       const { data: expensesRaw, error: expErr } = await supabase
@@ -5341,7 +5841,8 @@ app.post('/api/auth/login', async (req, res) => {
         expenses.push({ category, description, total });
       });
 
-      res.json({ success: true, data: { salesByCategory, returnsByCategory, salesByPaymentMethod, returnsByPaymentMethod, purchases, expenses, categories } });
+      const salesTotals = Object.fromEntries(dailyTotalSales);
+      res.json({ success: true, data: { salesByCategory, returnsByCategory, salesByPaymentMethod, returnsByPaymentMethod, salesTotals, purchases, expenses, categories } });
     } catch (error: any) {
       console.error('Supabase daily PDF report error:', error);
       res.status(500).json({ success: false, message: error.message });
@@ -5353,6 +5854,7 @@ app.post('/api/auth/login', async (req, res) => {
     try {
       const { start_date, end_date } = req.query;
       const dateParams = { start: `${start_date}T00:00:00`, end: `${end_date}T23:59:59` };
+      const tz = await readTimezone();
 
       // 1. Daily Sales and COGS
       const { data: salesRaw } = await supabase
@@ -5370,7 +5872,7 @@ app.post('/api/auth/login', async (req, res) => {
 
       const dailySalesMap = new Map();
       (salesRaw || []).forEach((si: any) => {
-        const date = si.sales.created_at.split('T')[0];
+        const date = getLocalDateString(si.sales.created_at, tz);
         const current = dailySalesMap.get(date) || { sales: 0, cogs: 0 };
         current.sales += si.subtotal;
         current.cogs += (si.quantity * (si.products?.purchase_price || 0));
